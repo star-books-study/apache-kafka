@@ -28,3 +28,5 @@ $ ls /tmp/kafka-logs/hello.kafka-0
 - 데이터 복제는 파티션 단위로 이루어진다.
 ![image](https://github.com/user-attachments/assets/ce7f3391-86b1-4876-8cc2-7e15ce56d7fd)
 - 복제 개수의 최솟값은 1(복제 없음), 최댓값은 브로커 개수만큼 설정하여 사용 가능
+- 다음은 복제 개수가 3인 경우이다. 복제된 파티션은 리더와 팔로워로 구성된다.
+![image](https://github.com/user-attachments/assets/0e23d909-754a-40a7-a72e-115423380865)
