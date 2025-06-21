@@ -41,4 +41,6 @@ $ ls /tmp/kafka-logs/hello.kafka-0
 - 안정성이 좋지만 서버는 언제든 장애가 발생할 수 있음
 
 ![image](https://github.com/user-attachments/assets/0e23d909-754a-40a7-a72e-115423380865)
-- 
+
+#### 컨트롤러
+- 다수 브로커 중 한 대가 컨트롤러의 역할을 한다.
