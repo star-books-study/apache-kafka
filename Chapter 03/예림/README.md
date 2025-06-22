@@ -42,5 +42,99 @@ $ ls /tmp/kafka-logs/hello.kafka-0
 
 ![image](https://github.com/user-attachments/assets/0e23d909-754a-40a7-a72e-115423380865)
 
-#### 컨트롤러
+### 컨트롤러
 - 다수 브로커 중 한 대가 컨트롤러의 역할을 한다.
+- 컨트롤러의 역할 : 다른 브로커들 상태 체크, 브로커가 클러스터에서 빠지는 경우 해당 브로커에 존재하는 리더 파티션을 재분배
+- 카프카는 지속적으로 데이터를 처리해야 하므로 브로커의 상태가 비정상이라면 빠르게 클러스터에서 빼내는 것이 중요
+
+### 데이터 삭제
+- 카프카는 컨슈머가 데이터를 가져가더라도 토픽의 데이터가 삭제되지 않음
+- 컨슈머나 프로듀서가 데이터 삭제를 요청할 수도 없고, **오직 브로커만이 데이터 삭제 가능*
+- 데이터 삭제는 파일 단위로 이뤄지는데 이 단위를 '로그 세그먼트'라고 함
+- 카프카 브로커에 log.segment.bytes 또는 log.segment.ms 옵션에 값이 설정되면 세그먼트 파일이 닫힘.
+
+### 컨슈머 오프셋 저장
+- 컨슈머 그룹은 토픽이 특정 파티션으로부터 데이터를 가져가서 처리하고 이 파티션의 어느 레코드까지 가져갔는지 확인하기 위해 오프셋을 커밋한다.
+
+
+### 코디네이터
+- 클러스터의 다수 브로커 중 한 대는 코디네이터의 역할을 수행한다.
+- 코디네이터는 컨슈머 그룹의 상태를 체크하고 파티션을 컨슈머와 매칭되도록 분배하는 역할을 한다.
+- 카프카 서버에서 직접 주키퍼에 붙으려면 카프카 서버에서 실행되고 있는 주키퍼에 연결해야 하는데, 동일 환경에서 접속하므로 localhost로 접속하며 포트 번호는 주키퍼 기본 포트인 2181을 입력하면 된다.
+
+```bash
+$ bin/zookeeper-shell.sh my-kafka:2181
+```
+
+## 3.2 토픽과 파티션
+- 토픽 : 카프카에서 데이터를 구분하기 위해 사용하는 단위. 1개 이상의 파티션을 소유하고 있다.
+- 파티션은 카프카의 병렬 처리의 핵심으로써 그룹으로 묶인 컨슈머들이 레코드를 병렬로 처리할 수 있도록 매칭된다.
+- 파티션은 FIFO 구조와 같이 먼저 들어간 레코드는 컨슈머가 먼저 가져가게 된다.
+
+## 3.3 레코드
+- 레코드는 타임스탬프, 메시지 키, 메시지 값, 오프셋, 헤더로 구성되어 있다.
+- 타임스탬프는 프로듀서에서 해당 레코드가 생성된 시점의 유닉스 타임이 설정된다.
+- 메시지 키는 메시지 값을 순서대로 처리하거나 메시지 값의 종류를 나타내기 위해 사용한다.
+- 메시지 키의 메시지값은 직렬화되어 브로커로 전송
+
+## 3.4 카프카 클라이언트
+- 카프카 클라이언트 라이브러리는 카프카 프로듀서, 컨슈머, 어드민 클라이언트를 제공하는 카프카 클라이언트를 사용하여 애플리케이션을 개발한다.
+- 카프카 클라이언트는 라이브러리이기 대문에 자체 라이프사이클을 가진 프레임워크나 애플리케이션 위에서 구현하고 실행해야 한다.
+
+### 3.4.1 프로듀서 API
+- 카프카에서 데이터의 시작점은 프로듀서이다.
+- 프로듀서 애플리케이션은 카프카에 필요한 데이터를 선언하고 브로커의 특정 토픽과 파티션에 전송한다.
+- 프로듀서는 데이터를 전송할 때 리더 파티션을 가지고 있는 카프카 브로커와 직접 통신한다.
+- 프로듀서는 데이터를 직렬화하여 카프카 브로커로 보내기 때문에 자바에서 선언 가능한 모든 형태를 브로커로 전송할 수 있다.
+
+#### 카프카 프로듀서 프로젝트 생성
+```
+dependencies {
+  compile 'org.apache.kafka:kafka-clients:2.5.0'
+}
+```
+
+```java
+public class SimpleProducer {
+    private final static Logger logger = LoggerFactory.getLogger(SimpleProducer.class);
+    private final static String TOPIC_NAME = "test";
+    private final static String BOOTSTRAP_SERVERS = "my-kafka:9092";
+
+    public static void main(String[] args) {
+
+        Properties configs = new Properties();
+        configs.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS); // 프로듀서 옵션을 key / value 값으로 선언
+        configs.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+        configs.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+
+        KafkaProducer<String, String> producer = new KafkaProducer<>(configs);
+
+        String messageValue = "testMessage";
+        ProducerRecord<String, String> record = new ProducerRecord<>(TOPIC_NAME, messageValue);
+        
+        producer.send(record);
+        logger.info("{}", record);
+        producer.flush();
+        producer.close();
+    }
+}
+```
+이 프로젝트를 실행하고 로그를 확인해보면 카프카 프로듀서 구동 시 설정한 옵션, 카프카 클라이언트 버전, 전송한 ProducerRecord가 출력된다.
+
+```bash
+$ bin/kafka-console-consumer.sh --bootstrap-server my-kafka:9092 --topic test--from-beginning
+testMessage
+```
+
+#### 프로듀서 중요 개념
+- 프로듀서 API를 사용하면 UniformSticyPartitioner와 RoundRobinPartitionar가 있는데 전자가 후자를 발전시킨 것
+
+#### 프로듀서 주요 옵션
+- 필수 옵션과 주요 옵션이 있다. 선택 옵션도 중요하다.
+
+- 필수 옵션
+  - bootstrap.servers
+  - key.serilizer
+  - value.serilizer
+- 선택 옵션
+  - 생략
