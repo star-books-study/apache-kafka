@@ -91,3 +91,58 @@ Record = {
 ```
 
 ## 3.4. 카프카 클라이언트
+### 3.4.1. 프로듀서 API
+- 프로듀서는 데이터를 전송할 때 **리더 파티션을 가지고 있는 카프카 브로커와 직접 통신**한다
+
+#### 카프카 프로듀서 프로젝트 생성
+```java
+KafkaProducer<String, String> producer = new KafkaProducer<String, String>(configs);
+
+String messageKey = "key1";
+String messageValue = "testMessage";
+ProducerRecord<String, String> record = new ProducerRecord(TOPIC_NAME, messageKey, messageValue);
+producer.send(record); // A
+producer.flush(); // B
+```
+- A: send() 메서드는 즉각적인 전송을 뜻하는 것이 아니라, **파라미터로 들어간 record를 프로듀서 내부에 가지고 있다가, 배치 형태로 묶어서 브로커에 전송**한다. 
+  - 이러한 전송 방식을 '배치 전송' 이라고 부른다. 
+  - 배치 전송을 통해 카프카는 타 메시지 플랫폼과 차별화된 전송 속도를 가지게 되었다.
+- B: flush() 메서드는 **프로듀서 내부 버퍼에 가지고 있던 레코드 배치를 브로커로 전송**한다.
+
+#### 프로듀서 중요 개념
+![alt text](image-2.png)
+- KafkaProducer 인스턴스가 `send()` 메서드를 호출하면, ProducerRecord는 **파티셔너(partitioner)에서 토픽의 어느 파티션으로 전송될 것인지 정해진다.**
+- 파티셔너에 의해 구분된 레코드는 데이터를 전송하기 전에 **어큐뮬레이터(accumulator)에 데이터를 버퍼로 쌓아놓고 발송**한다.
+  - 버퍼로 쌓인 데이터는 **배치**로 묶어서 전송함으로써 카프카의 프로듀서 처리량을 향상시키는데 도움을 준다.
+- 카프카 클라이언트 라이브러리 2.5.0 버전에서 파티셔너를 지정하지 않은 경우 UniformStickyPartitioner 가 기본 파티셔너로 설정된다.
+  - UniformStickyPartitioner, RoundRobinPartitioner 파티셔너의 공통점 : 메시지 키가 있을 때는 메시지 키의 해시값과 파티션을 매칭하여 데이터를 전송한다는 점이다.
+- 카프카 2.4.0 이전에는 RoundRobinPartitioner가 기본 파티셔너로 설정되어 있었다.
+  - **ProducerRecord가 들어오는 대로 파티션을 순회하면서 전송하기 때문에 배치로 묶이는 빈도가 적다.**
+  - 될 수 있으면 많은 데이터가 배치로 묶여 전송되어야 성능 향상을 기대할 수 있으므로, 카프카 2.4.0부터는 UniformStickyPartitioner가 기본 파티셔너로 설정되었다.
+- UniformStickyPartitioner
+  - 프로듀서 동작에 특화되어 높은 처리량과 낮은 리소스 사용률을 가진다.
+  - **어큐뮬레이터에서 데이터가 배치로 모두 묶일 때까지 기다렸다가 배치로 묶인 데이터는 모두 동일한 파티션에 전송**함으로써 RoundRobinPartitioner에 비해 향상된 성능을 가지게 되었다.
+- Partitioner 인터페이스를 상속받은 사용자 정의 클래스에서 메시지 키 또는 메시지 값에 따라 파티션 지정 로직을 지정할 수 있다.
+> 그러나, 카프카 버전 3.3 부터는 DefaultPartitioner, UniformStickyPartitioner는 deprecated됨
+- 프로듀서는 압축 옵션을 통해 브로커로 전송 시 압축 방식을 정할 수 있다. ex) gzip, snappy, lz4, zstd 를 지원
+- 압축을 하면 데이터 전송 시 네트워크 처리량에 이득을 볼 수 있지만, 압축을 하는데에 CPU 나 메모리 리소스를 사용하므로 사용환경에 따라 적절한 압축 옵션을 사용하는 것이 중요하다.
+
+#### 프로듀서 주요 옵션
+- 필수 옵션
+  - `bootstrap.servers` : 프로듀서가 데이터를 전송할 대상 카프카 클러스터에 속한 브로커의 호스트 이름:포트 를 1개 이상 작성
+  - `key.serializer` : 레코드의 메시지 키를 직렬화하는 클래스
+  - `value.serializer` : 레코드의 메시지 값을 직렬화하는 클래스
+- 선택 옵션
+  - `acks` : 프로듀서가 전송한 데이터가 **브로커들에 정상적으로 저장되었는지 전송 성공 여부를 확인하는데 사용하는 옵션**
+    - 1 : 기본값. 리더 파티션에 데이터가 저장되면 전송 성공으로 판단.
+    - 0 : 프로듀서가 전송한 즉시, 브로커에 데이터 저장 여부 상관없이 성공으로 판단.
+    - -1 (all) : 토픽의 min.insync.replicas 개수에 해당하는 리더 파티션, 팔로워 파티션에 데이터가 저장되면 성공으로 판단.
+  - `buffer.memory` : 브로커로 전송할 데이터를 배치로 모으기 위해 설정할 버퍼 메모리양 지정. 기본값은 32MB(33554432)
+  - `retries` : 프로듀서가 브로커로부터 에러를 받고 난 뒤 재전송 시도 횟수. 기본값은 2147483647
+  - `batch.size` : 배치로 전송할 레코드 최대 용량. 너무 작게 설정하면 프로듀서가 브로커로 더 자주 보내기 때문에 네트워크 부담이 있고, 너무 크게 설정하면 메모리를 더 많이 사용하게 되는 점을 주의. 기본값은 16384.
+  - `linger.ms` : 배치를 전송하기 전까지 기다리는 최소 시간. 기본값은 0.
+  - `partitioner.class` : 레코드를 파티션에 전송할 때, 적용하는 파티션 클래스 지정. 기본값은 DefaultPartitioner
+  - `enable.idempotence` : 멱등성 프로듀서로 동작할 지 여부 설정. 기본값 false.
+  - `transactional.id` : 프로듀서가 레코드를 전송할 때, 레코드를 트랜잭션 단위로 묶을지 설정. 프로듀서의 고유한 트랜잭션 id를 설정할 수 있다. 이 값을 설정하면 트랜잭션 프로듀서로 동작한다.
+
+#### 메시지 키를 가진 데이터를 전송하는 프로듀서
