@@ -148,3 +148,10 @@ producer.flush(); // B
 #### 브로커 정상 전송 여부를 확인하는 프로듀서
 - KakfaProducer.send() 메서드는 Future 객체를 반환하는데, 이는 RecordMetatdata 의 비동기 결과를 표현한다
 - send() 의 결과값은 **카프카 브로커로부터 응답을 기다렸다가, 브로커로부터 응답이 오면 RecordMetatdata 인스턴스를 반환**한다
+- 프로듀서는 비동기로 결과를 확인할 수 있도록 callback 인터페이스를 제공한다. 따라서 비동기로 결과를 받으려면 ProducerRecord 객체와 함께 사용자 정의 callback 클래스를 넣으면 된다
+  ```java
+  // kafkaTemplate
+  Future<RecordMetadata> sendFuture = producer.send(producerRecord, this.buildCallback(producerRecord, producer, future, sample, observation));
+  ```
+
+## 3.4.2. 컨슈머 API
