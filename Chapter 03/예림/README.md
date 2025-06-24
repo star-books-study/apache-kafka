@@ -138,3 +138,35 @@ testMessage
   - value.serilizer
 - 선택 옵션
   - 생략
+
+
+#### 메시지 키를 가진 데이터를 전송하는 프로듀서
+- 메시지 키가 포함된 레코드를 전송하고 싶다면 `ProducerRecord` 생성 시 파라미터로 추가해야 한다.
+- 토픽 이름, 메시지 키, 메시지 값을 순서대로 파라미터로 넣고 생성했을 경우 메시지 키가 지정된다.
+
+```java
+ProducerRecord<String, String> record = new ProducerRecord<>("test", "Pangyo", "23"); // 토픽 이름, 메시지 키, 메시지 값
+```
+
+- 메시지 키가 지정된 데이터는 kafka-console-consumer 명령을 통해 확인할 수 있는데, property 옵션의 print.key, key.separator 값을 주면 출력 화면에서 메시지 키와 메시지 값을 함께 확인할 수 있다.
+
+```bash
+$ bin/kafka-console-consumer.sh --bootstrap-server my-kafka:9092 \
+--topic test \
+--property print.key=true \
+--property key.separator="-" \
+--from-beginning
+null-testMessage
+Pangyo-23
+```
+![스크린샷 2025-06-24 오후 10 15 08](https://github.com/user-attachments/assets/ee76156f-42c0-4528-9958-f1d1e1f750dc)
+
+
+- 파티션을 직접 지정하고 싶다면 토픽 이름, 파티션 버호, 메시지 키, 메시지 값을 순서대로 파라미터로 넣고 생성하면 된다.
+- 파티션 번호는 토픽에 존재하는 파티션 번호로 설정해야 한다.
+
+```java
+int partitionNo = 0;
+ProducerRecord<String, String> record = new ProducerRecord<>(TOPIC_NAME, partitionNo, messageKey, messageValue);
+```
+
