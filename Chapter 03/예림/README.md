@@ -170,3 +170,39 @@ int partitionNo = 0;
 ProducerRecord<String, String> record = new ProducerRecord<>(TOPIC_NAME, partitionNo, messageKey, messageValue);
 ```
 
+#### 커스텀 파니셔너를 가지는 프로듀서
+- 특정 데이터를 가지는 레코드를 특정 파티션으로 보내야할 때 -> Partitioner 인터페이스 사용
+```java
+public class CustomPartitioner implements Partitioiner {
+
+  @Override
+  public int partition(String topic, Object key, byte[] keyBytes, Object value, byte[] valueBytes, Cluster cluster) {
+  if (keyBytes == null) {
+    throw new InvalidRecordException("Need message key");
+  }
+  if ((String)key).equals("Pangyo")) { // 메시지 키가 Pangyo인 경우 파티션 0번으로 지정되도록 0을 리턴
+    return 0;
+  }
+
+  List<PartitionInfo> partitions = cluser.partitionsForTopic(topic);
+  int numPartitions = partitions.size();
+  return Utils.toPositive(Utils.murmur2(keyBytes)) % numPartitions; 
+}
+
+... 생략 ...
+```
+- 리턴값은 주어진 레코드가 들어갈 파티션 번호
+- 커스텀 파티셔너를 지정한 경우 ProducerConfig의 PARTITIONAER_CLASS_CONFIG 옵션을 사용자 생성 파티셔너로 설정하여 KafkaProducer 인스턴스를 생성해야 한다.
+```java
+Properties configs = new Properties();
+configs.put (ProducerConfig. BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS) ;
+configs.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.
+getName ()) ;
+configs.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.
+getName ());
+configs.put (ProducerConfig.PARTITIONER_CLASS_CONFIG, CustomPartitioner.class);
+
+KafkaProducer<String, String producer = new KafkaProducer<>(configs) ;
+```
+#### 브로커 정상 전송 여부를 확인하는 프로듀서
+
