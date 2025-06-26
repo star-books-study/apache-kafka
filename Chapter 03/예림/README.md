@@ -206,3 +206,12 @@ KafkaProducer<String, String producer = new KafkaProducer<>(configs) ;
 ```
 #### 브로커 정상 전송 여부를 확인하는 프로듀서
 
+- KafkaProducer의 send() 메서드는 Fucture 객체 반환
+  - RecordMetadata의 비동기 결과를 표현하는 것
+  - ProducerRecord가 카프카 브로커에 정상적으로 적재되었는지에 대한 데이터 포함
+- get() 메서드를 사용하면 프로듀서로 보낸 데이터의 결과를 동기적으로 가져올 수 있음
+```java
+ProducerRecord<String, String> reccord = new ProducerRecord<>(TOPIC_NAME, messageValue);
+RecordMetadata metadata = producer.send(record).get(); // send()의 결과값은 브로커로부터 응답을 기다렸다가 응답이 오면 RecordMetadata 인스턴스 반환
+logger.info(metadata.toString());
+```
