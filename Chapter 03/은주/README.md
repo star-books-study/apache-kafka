@@ -155,9 +155,29 @@ producer.flush(); // B
   ```
 
 ## 3.4.2. 컨슈머 API
+### 카프카 컨슈머 프로젝트 생성
+- 컨슈머 그룹을 통해 `컨슈머 목적` 을 구분할 수 있다
+  - 동일한 역할을 하는 컨슈머를 묶어 관리 가능
+  - **컨슈머 그룹 기준으로 컨슈머 오프셋을 관리**하므로 subscribe() 메서드를 사용하여 토픽 구독할 때는 컨슈머 그룹을 선언해야 한다
+  - **컨슈머 중단, 재시작되더라도 컨슈머 그룹의 컨슈머 오프셋을 기준으로 이후 데이터 처리**를 하기 때문
+  - 컨슈머 그룹 미선언 시 어떤 그룹에도 속하지 않는 컨슈머로 동작
+- 컨슈머에게 토픽을 할당하기 위해 subscribe() 메서드 사용
+  ```java
+  KafkaConsumer<String, String> consumer = new KafkaConsumer<>(configs);
+  consumer.subscribe(Arrays.asList(TOPIC_NAME));
+  ```
+- 컨슈머는 poll() 메소드를 호출하여 데이터 가져와 처리. 지속적으로 데이터를 처리하기 위해서는 반복 호출 필요
+  ```java
+  while(true) {
+    ConsumerRecords<String, String> records = consumer.poll(Duration.ofSeconds(1));
+    ...
+  }
+  ```
+  - poll() 메서드의 Duration 타입 인자는, 브로커로부터 데이터를 가져올 때 **컨슈머 버퍼에 데이터를 기다리기 위한 타임아웃 간격**을 의미한다
+
 ### 컨슈머 중요 개념
 - 토픽의 파티션으로부터 데이터를 가져가기 위해 컨슈머 운영하는 방법
   - 1개 이상의 컨슈머로 이루어진 **컨슈머 그룹** 운영하기
   - 토픽의 **특정 파티션만 구독하는 컨슈머** 운영하기
 - 컨슈머 그룹으로 묶인 컨슈머들은 토픽의 1개 이상 파티션들에 할당되어 데이터를 가져갈 수 있다
-![alt text](image-3.png)
+![alt text](image-3.png) 
