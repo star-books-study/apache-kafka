@@ -215,3 +215,21 @@ ProducerRecord<String, String> reccord = new ProducerRecord<>(TOPIC_NAME, messag
 RecordMetadata metadata = producer.send(record).get(); // send()의 결과값은 브로커로부터 응답을 기다렸다가 응답이 오면 RecordMetadata 인스턴스 반환
 logger.info(metadata.toString());
 ```
+
+```java
+[main] INFO com.example.ProducerWithSyncCallback - test-2@1
+```
+- 레코드가 정상적으로 브로커에 적재되었다면 토픽 이름과 파티션 번호, 오프셋 번호가 출력된다.
+- 전송된 레코드는 test 토픽 2번 파티션에 적재되었고 오프셋 번호는 1번인 것을 알 수 있다.
+- 비동기로 확인할 수도 있다 -> Callback 인터페이스
+```java
+public class ProducerCallback impelement Callback {
+  private final static Logger logger = LoggerFactory.getLogger(ProducerCallback.class);
+
+  @Override
+  public void onCompletion(RecordMetadata recordMetadata, Exception e) {
+    // 생략
+  }
+}
+```
+
