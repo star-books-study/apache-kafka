@@ -211,7 +211,7 @@ KafkaProducer<String, String producer = new KafkaProducer<>(configs) ;
   - ProducerRecord가 카프카 브로커에 정상적으로 적재되었는지에 대한 데이터 포함
 - get() 메서드를 사용하면 프로듀서로 보낸 데이터의 결과를 동기적으로 가져올 수 있음
 ```java
-ProducerRecord<String, String> reccord = new ProducerRecord<>(TOPIC_NAME, messageValue);
+ProducerRecord<String, String> record = new ProducerRecord<>(TOPIC_NAME, messageValue);
 RecordMetadata metadata = producer.send(record).get(); // send()의 결과값은 브로커로부터 응답을 기다렸다가 응답이 오면 RecordMetadata 인스턴스 반환
 logger.info(metadata.toString());
 ```
@@ -232,4 +232,20 @@ public class ProducerCallback impelement Callback {
   }
 }
 ```
+- onCompletion 메서드는 레코드의 비동기 결과를 받기 위해 사용한다.
+- 브로커 적재에 이슈가 생기면 -> Exception에 어떤 에러가 발생했는지 담겨서 메서드 실행
+- 에러가 발생하지 않으면 -> RecordMetadata에 해당 레코드가 적재된 토픽 이름과 파티션 번호, 오프셋을 알 수 있음
+```java
+KafkaProducer<String, String> producer = new KafkaProducer<>(configs);
+ProducerRecord<String, String> record = new ProducerRecord<>(TOPIC_NAME, messageValue);
+producer.send(record, new ProducerCallback()); // 여기 주목
+```
+- 비동기로 결과를 받기 위해서는 ProducerRecord 객체와 함께 사용자 정의 Callback 클래스를 넣으면 된다.
+- 주의 : 데이터의 순서가 중요한 경우에는 비동기로 전송 결과를 받아선 안된다.
 
+### 3.4.2 컨슈머 API
+- 프로듀서가 전송한 데이터는 카프카 브로커에 적재된다.
+- 컨슈머는 적재된 데이터를 사용하기 위해 브로커러부터 데이터를 가져와서 필요한 처리를 한다.
+
+#### 카프카 컨슈머 프로젝트 생성
+- 기본 설정으로 생성할 수 있는 오토 커밋 카프카 컨슈머 애플리케이션을 만들어 보자.
