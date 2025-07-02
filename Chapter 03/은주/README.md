@@ -255,3 +255,11 @@ producer.flush(); // B
 
 ### 리밸런스 리스너를 가진 컨슈머
 - poll() 메소드를 통해 반환된 데이터를 모두 처리하기 전 (= 커밋하지 않았으면) **리밸런스가 발생하면 데이터를 중복 처리할 수 있다**
+- 리밸런스 발생을 감지하기 위해 ConsumerRebalanceListener 인터페이스를 지원한다
+  ```java
+  public interface ConsumerRebalanceListener {
+      void onPartitionsRevoked(Collection<TopicPartition> var1); // 리밸런스가 시작되기 직전 호출되는 메소드
+      void onPartitionsAssigned(Collection<TopicPartition> var1); // 리밸런스 끝나고 파티션 할당 완료되면 호출되는 메소드
+  }
+  ```
+- 마지막으로 처리한 레코드를 기준으로 커밋을 하기 위해서 리밸런스 시작 전, 커밋을 하면 되므로 onPartitionsRevoked() 메서드에 커밋을 구현하면 된다
