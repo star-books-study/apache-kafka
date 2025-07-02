@@ -252,7 +252,7 @@ producer.send(record, new ProducerCallback()); // 여기 주목
 ```java
 public class SimpleConsumer {
   private final static Logger logger = LoggerFactory. getLogger (SimpleConsumer.class);
-  private final static String TOPIC_NAME = "test";
+  private final static String TOPIC_NAME = "test"; // 토픽 이름 지정
   private final static String BOOTSTRAP_SERVERS = "my-kafka:9092";
   private final static String GROUP_ID = "test-group";
   public static void main(String[] args) {
