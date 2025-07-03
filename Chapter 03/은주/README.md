@@ -255,6 +255,7 @@ producer.flush(); // B
 
 ### 리밸런스 리스너를 가진 컨슈머
 - poll() 메소드를 통해 반환된 데이터를 모두 처리하기 전 (= 커밋하지 않았으면) **리밸런스가 발생하면 데이터를 중복 처리할 수 있다**
+- 리밸런스 발생 시 데이터 중복처리하지 않으려면, **리밸런스 발생 시 처리한 데이터를 기준으로 커밋을 시도해야 한다.**
 - 리밸런스 발생을 감지하기 위해 ConsumerRebalanceListener 인터페이스를 지원한다
   ```java
   public interface ConsumerRebalanceListener {
@@ -263,3 +264,47 @@ producer.flush(); // B
   }
   ```
 - 마지막으로 처리한 레코드를 기준으로 커밋을 하기 위해서 리밸런스 시작 전, 커밋을 하면 되므로 onPartitionsRevoked() 메서드에 커밋을 구현하면 된다
+```java
+while (true) {
+    ConsumerRecords<String, String> records = consumer.poll(Duration.ofSeconds(1));
+    for (ConsumerRecord<String, String> record : records) {
+        logger.info("{}", record);
+        currentOffsets.put(
+            new TopicPartition(record.topic(), record.partition()),
+            new OffsetAndMetadata(record.offset() + 1, null)
+            // 이렇게 +1을 해줌으로서 컨슈머 재시작시 파티션에서 가장 마지막 값을 기준으로 레코드를 읽기 시작한다.
+        );
+        consumer.commitSync(currentOffsets);
+    }
+}
+```
+> offset: 0   →  메시지 A  
+> offset: 1   →  메시지 B  
+> offset: 2   →  메시지 C <br>
+> 만약 오프셋 1을 커밋하면, 다음에 컨슈머가 시작할 때는 offset 1부터 읽는 게 아니라 1 다음인 2부터 읽음
+> ```java
+> currentOffsets.put(
+>    new TopicPartition(record.topic(), record.partition()),
+>    new OffsetAndMetadata(record.offset() + 1, null)
+>);
+>```
+> - record.offset()은 현재 처리한 메시지의 offset
+> - 여기에 +1을 해서 커밋하는 이유는 "지금 이 메시지는 처리 완료했으니까, 다음에는 이 다음 메시지부터 읽어줘" 라는 의미
+> - **즉, offset + 1을 커밋해야 "이 메시지는 이미 처리된 것이고, 다음 offset부터 다시 읽자" 라는 정확한 위치를 Kafka에 알려주는 것**
+> - 🔁 만약 +1을 안 하면?
+>   - 예를 들어 offset 5 메시지를 읽고 처리했는데, offset 5를 그대로 커밋하면?
+>   - 다음에 컨슈머가 재시작하면 같은 offset 5의 메시지를 다시 읽게 됨 <br>→ 중복 처리가 발생할 수 있음
+
+
+### 파티션 할당 컨슈머
+- 컨슈머가 어떤 토픽, 파티션을 할당할지 명시적으로 선언할 때는 `assign()` 메소드를 사용하면 된다
+  - `subscribe()` 메소드 사용할 때와 다르게, **직접 컨슈머가 특정 토픽/파티션에 할당되므로 리밸런싱 과정이 없다**
+  > ✅ subscribe() 사용 시
+  > - **컨슈머 그룹 내에서 여러 컨슈머가 토픽을 공유해서 처리할 수 있도록 Kafka가 자동으로 파티션을 할당**
+  > - 이 과정에서 Kafka의 Group Coordinator가 관여하며, 컨슈머가 추가되거나 제거되면 리밸런싱이 트리거됨
+  > - 리밸런싱 중에는 컨슈머가 일시적으로 메시지를 읽지 못하는 시간이 생길 수 있음
+  > 
+  > ✅ assign() 사용 시
+  > - 특정 컨슈머가 직접 어떤 토픽의 어떤 파티션을 처리할지 명시적으로 지정
+  > - **이 경우에는 Kafka가 파티션 할당을 관리하지 않기 때문에 리밸런싱이 발생하지 않음**
+  > - 다만, 컨슈머 그룹의 개념이 적용되지 않으므로 컨슈머 간의 자동 분산 처리가 되지 않음 (개발자가 직접 파티션을 나누어야 함)
