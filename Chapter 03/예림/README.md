@@ -254,21 +254,21 @@ public class SimpleConsumer {
   private final static Logger logger = LoggerFactory. getLogger (SimpleConsumer.class);
   private final static String TOPIC_NAME = "test"; // 토픽 이름 지정
   private final static String BOOTSTRAP_SERVERS = "my-kafka:9092";
-  private final static String GROUP_ID = "test-group";
+  private final static String GROUP_ID = "test-group"; // 컨슈머 그룹 이름으로 컨슈머 목적 구분 가능
   public static void main(String[] args) {
     Properties configs = new Properties () ;
     configs.put (ConsumerConfig. BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS) ;
     configs.put (ConsumerConfig. GROUP_ID_CONFIG, GROUP_ID);
     configs.put (ConsumerConfig. KEY_DESERIALIZER_CLASS_CONFIG,
-    StringDeserializer.class.getName ());
+    StringDeserializer.class.getName ()); // 역질렬화 클래스 지정 / 메시지 키, 값에 대해 둘 다 역질렬화 클래스를 지정해야 한다.
     configs.put (ConsumerConfig. VALUE_DESERIALIZER_CLASS_CONFIG,
     StringDeserializer.class.getName ());
-    KafkaConsumer<String, String> consumer = new KafkaConsumer<> (configs);
-    consumer. subscribe (Arrays. asList (TOPIC_NAME)) ;
+    KafkaConsumer<String, String> consumer = new KafkaConsumer<> (configs); 
+    consumer. subscribe (Arrays. asList (TOPIC_NAME)) ; // 컨슈머에게 토픽 할당
     while (true) {
       ofSeconds (1));
-      ConsumerRecords<String, String> records = consumer .poll (Duration.
-      for (ConsumerRecord String, String> record : records) {
+      ConsumerRecords<String, String> records = consumer .poll (Duration.ofSeconds(1)); // 컨슈머는 poll() 메서드를 호출해 데이터를 가져와서 처리 / 지속적으로 반복 호출해야 하므로 while 루프 사용
+      for (ConsumerRecord String, String> record : records) { // for 루프를 통해 poll 메서드가 반환한 ConsumerRecord 데이터 순차 처리
         logger.info ("{}", record);
       }
     }
