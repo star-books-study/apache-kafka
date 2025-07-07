@@ -376,8 +376,13 @@ while (true) {
   - 다만, GlobalKTable을 사용하면 각 태스크마다 GlobalKTable로 정의된 모든 데이터를 저장하고 사용하기 때문에 **스트림즈 애플리케이션의 로컬 스토리지의 사용량이 증가하고 네트워크, 브로커에 부하가 생기므로 되도록이면 작은 용량의 데이터일 경우에만 사용하는 것이 좋다.**
 
 #### 스트림즈DSL - stream(), to()
+![alt text](image-13.png)
+
 - **특정 토픽을 KStream 형태로 가져오려면** 스트림즈DSL의 `stream()` 메서드를 사용하면 된다
   - stream(), table(), globalTable() 메서드 : 최초의 토픽 데이터를 가져오는 소스 프로세서
 - **KStream 의 데이터를 특정 토픽으로 저장**하려면 스트림즈DSL 의 `to()` 메서드를 사용한다
   - to() 메서드 : 싱크 프로세서
-![alt text](image-13.png)
+
+#### 스트림즈DSL - filter()
+![alt text](image-14.png)
+- filter() : 스트림즈DSL 에서 사용 가능한 필터링 스트림 프로세서
