@@ -383,6 +383,15 @@ while (true) {
 - **KStream 의 데이터를 특정 토픽으로 저장**하려면 스트림즈DSL 의 `to()` 메서드를 사용한다
   - to() 메서드 : 싱크 프로세서
 
+```java
+StreamsBuilder builder = new StreamsBuilder(); // 스트림 토폴로지 정의
+KStream<String, String> source = builder.stream(STREAM_LOG); 
+source.to(STREAM_LOG_COPY);
+```
+
 #### 스트림즈DSL - filter()
 ![alt text](image-14.png)
 - filter() : 스트림즈DSL 에서 사용 가능한 필터링 스트림 프로세서
+  - 자바 함수형 인터페이스인 Predicate 을 파라미터로 받음
+
+#### 스트림즈DSL - KTable 과 KStream 을 join()
