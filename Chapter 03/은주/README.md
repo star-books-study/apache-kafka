@@ -397,3 +397,22 @@ source.to(STREAM_LOG_COPY);
 #### 스트림즈DSL - KTable 과 KStream 을 join()
 - 대부분의 데이터베이스는 정적으로 저장된 데이터를 조인하여 사용하지만, **카프카에서는 실시간으로 들어오는 데이터들을 조인할 수 있다**
 - 사용자의 이벤트 데이터를 DB 에 저장하지 않고도 조인하여 스트리밍 처리할 수 있다는 장점이 있다. <br> 이를 통해, **이벤트 기반 스트리밍 데이터 파이프라인을 구성**할 수 있다.
+
+```java
+StreamsBuilder builder = new StreamsBuilder();       
+KTable<String, String> addressTable = builder.table(ADDRESS_TABLE); // KTable 
+KStream<String, String> orderStream = builder.stream(ORDER_STREAM); // KStream
+
+orderStream.join(addressTable,
+    (order, address) -> order + " send to " + address)
+  .to(ORDER_JOIN_STREAM);
+  
+KafkaStreams streams = new KafkaStreams(builder.build(), props);        
+streams.start();
+```
+- 조인을 위해 KStream 인스턴스에 정의된 join() 메소드를 사용
+  - 첫번째 파라미터로 조인을 수행할 KTable 인스턴스를 넣는다
+  - KTable 에 존재하는 `메시지 키` 기준으로 KStream 이 데이터를 조인한다
+  - 조인할 때 사용했던 메시지 키는 조인이 된 데이터의 메시지 키로 들어간다
+
+#### 스트림즈DSL - GlobalKTable 과 KStream 을 join()
