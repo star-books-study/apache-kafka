@@ -419,3 +419,22 @@ streams.start();
 - 코파티셔닝되지 않은 데이터를 조인하는 방법 2가지
   - 리파티셔닝 수행 -> 코파티셔닝이 된 상태로 조인 처리
   - KTable 로 사용하는 토픽을 GlobalKTable 로 선언하여 사용
+```java
+StreamsBuilder builder = new StreamsBuilder();       
+GlobalKTable<String, String> addressGlobalTable = builder.globalTable(ADDRESS_GLOBAL_TABLE); // GlobalKTable 
+KStream<String, String> orderStream = builder.stream(ORDER_STREAM); // KStream
+
+orderStream.join(addressGlobalTable,
+    (orderKey, orderValue) -> orderKey,
+    (order, address) -> order + " send to " + address)
+  .to(ORDER_JOIN_STREAM);
+  
+KafkaStreams streams = new KafkaStreams(builder.build(), props);        
+streams.start();
+```
+- GlobalKTable 은 KTable 조인과 다르게, **레코드 매칭 시 KStream 의 메시지 키, 메시지 값 둘 다 사용할 수 있다**
+  - KStream 의 `메시지 값`을 GlobalKTable 의 `메시지 키`와 조인할 수 있다.
+- GlobalKTable 로 선언한 토픽은, 토픽에 존재하는 모든 데이터를 태스크마다 저장하고 조인 처리를 수행하는 점이 KTable 과 다르다.
+  > KTable 로 선언된 토픽은 1개 파티션이 1개 태스크에 할당되어 사용되고, GlobalKTable 로 선언된 토픽은 모든 파티션 데이터가 각 태스크에 할당되어 사용된다
+
+### 3.5.2. 프로세서 API
