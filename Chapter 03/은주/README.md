@@ -394,6 +394,13 @@ source.to(STREAM_LOG_COPY);
 - filter() : 스트림즈DSL 에서 사용 가능한 필터링 스트림 프로세서
   - 자바 함수형 인터페이스인 Predicate 을 파라미터로 받음
 
+```java
+StreamsBuilder builder = new StreamsBuilder();
+KStream<String, String> streamLog = builder.stream(STREAM_LOG);
+KStream<String, String> filteredStream = streamLog.filter(
+    (key, value) -> value.length() > 5); 	 
+filteredStream.to(STREAM_LOG_FILTER);
+```
 #### 스트림즈DSL - KTable 과 KStream 을 join()
 - 대부분의 데이터베이스는 정적으로 저장된 데이터를 조인하여 사용하지만, **카프카에서는 실시간으로 들어오는 데이터들을 조인할 수 있다**
 - 사용자의 이벤트 데이터를 DB 에 저장하지 않고도 조인하여 스트리밍 처리할 수 있다는 장점이 있다. <br> 이를 통해, **이벤트 기반 스트리밍 데이터 파이프라인을 구성**할 수 있다.
@@ -438,3 +445,48 @@ streams.start();
   > KTable 로 선언된 토픽은 1개 파티션이 1개 태스크에 할당되어 사용되고, GlobalKTable 로 선언된 토픽은 모든 파티션 데이터가 각 태스크에 할당되어 사용된다
 
 ### 3.5.2. 프로세서 API
+- 프로세서 API는 스트림즈DSL보다 투박한 코드를 가지지만 토폴로지를 기준으로 데이터를 처리한다는 관점에서는 동일한 역할을 한다.
+  - 스트림즈DSL 에도 다양한 메소드가 존재하지만, 추가적인 상세 로직의 구현이 필요하다면 프로세서 API 를 활용할 수 있다
+```java
+public class FilterProcessor implements Processor<String, String> {
+  private ProcessorContext context;
+  
+  @Override 
+  public void init(ProcessorContext context) { // 1.
+    this.context = context;
+  }
+
+  @Override 
+  public void process(String key, String value) { // 2.
+    if (value.length() > 5) { 
+      context.forward(key, value);
+    } 
+    context.commit();
+  }
+  
+  @Override
+  public void close() { // 3.
+    ...
+  }
+}
+```
+- 스트림 프로세서 클래스 생성하기 위해서는 Processor or Transformer 인터페이스 사용 필요
+- 2: ProcessorContext 클래스는 프로세서 정보를 담고 있음
+  - ProcessorContext 클래스로 생성된 인스턴스로 현재 스트림 처리 중인 토폴로지의 토픽 정보, 애플리케이션 아이디 조회 가능
+  - 필터링된 데이터 처리의 경우 `forward()` 메소드를 통해 **다음 토폴로지 (= 다음 프로세서) 로 넘어가도록 한다**
+  - 처리 완료 후에는 `commit()` 을 호출하여 명시적으로 데이터 처리되었음을 선언한다
+- 3: FilterProcessor가 종료되기 전에 호출되는 메서드로, 프로세싱을 하기 위해 사용했던 리소스를 해제하는 구문을 넣는다.
+
+```java
+Topology topology = new Topology();
+topology.addSource("Source", STREAM_LOG) // stream_log 토픽을 소스 프로세서로 가져오기 위함
+  .addProcessor( // 스트림 프로세서를 사용하기 위함
+      "Process",
+      () -> new FilterProcessor(),
+      "Source")
+  .addSink( // 싱크 프로세서로 사용하기 위함
+      "Sink",
+      STREAM_LOG_FILTER,
+      "Process");
+KafkaStreams streaming = new KafkaStreams(topology, props);
+```
