@@ -490,3 +490,7 @@ topology.addSource("Source", STREAM_LOG) // stream_log 토픽을 소스 프로�
       "Process");
 KafkaStreams streaming = new KafkaStreams(topology, props);
 ```
+
+## 3.6. 카프카 커넥트
+- 카프카 커넥트 : 카프카 오픈소스에 포함된 툴 중하나, **데이터 파이프라인 생성 시 반복 작업을 줄이고 효율적인 전송을 하기 위한 애플리케이션**
+- 커넥터는 프로듀서 역할의 `소스 커넥터`, 컨슈머 역할의 `싱크 커넥터`로 나뉜다
