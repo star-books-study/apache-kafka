@@ -300,3 +300,6 @@ public class SimpleConsumer {
   - 편리하지만 호출 이후에 리밸런싱 또는 컨슈머 강제 종료 발생 시 데이터 중복 또는 유실 가능
 - 명시적으로 오프셋을 커밋하려면 반환받은 데이터가 처리되고 commitSync() 메서드를 호출하면 된다.
   - 반환된 레코드의 가장 마지막 오프셋을 기준으로 커밋을 수행한다.
+- commitSync() 메서드는 응답하는 데 기다리는 시간이 있음 -> commitAsync()도 사용가능. 다만 순서는 보장하지 않고 중복 처리 발생할 수 있음
+
+<img width="512" height="233" alt="image" src="https://github.com/user-attachments/assets/3a8fb9ef-79ad-4119-acd8-06160b5d9505" />
