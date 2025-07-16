@@ -303,3 +303,57 @@ public class SimpleConsumer {
 - commitSync() 메서드는 응답하는 데 기다리는 시간이 있음 -> commitAsync()도 사용가능. 다만 순서는 보장하지 않고 중복 처리 발생할 수 있음
 
 <img width="512" height="233" alt="image" src="https://github.com/user-attachments/assets/3a8fb9ef-79ad-4119-acd8-06160b5d9505" />
+
+#### 컨슈머 주요 옵션
+- 필수 옵션
+  - bootstrap.servers
+  - key.deserializer
+  - value.deserializer
+- 선택 옵션
+  - 생략
+
+#### 동기 오프셋 커밋
+- poll() 호출 이후 commitSync()를 호출하여 오프셋 커밋을 명시적으로 수행할 수 있다.
+
+```java
+...(생략)...
+consumer.subscribe(Arrays.asList(TOPIC)NAME));
+...(생략)...
+while(true) {
+  ConsumerRecords<String, String> records = consumer.poll(Duration.ofSeconds(1));
+  ...(생략)...
+  consumer.commitSync();
+```
+- commitSync는 가장 마지막 레코드 오프셋을 기준으로 커밋 -> 그러므로 poll() 메서드로 받은 모든 레코드의 처리가 끝난 이후 commitSync()를 호출해야 한다.
+- 만약 개별 레코드 단위로 매번 오프셋을 커밋하고 싶다면 commitSync()의 파라미터로 Map<TopicPartition, OffsetAndMetadata> 인스턴스를 넣으면 된다.
+
+#### 비동기 오프셋 커밋
+- 동기 오프셋 커밋을 사용할 경우 커밋 응답을 기다리는 동안 데이터 처리가 일시적으로 중단되기 때문에 더 많은 데이터를 처리하기 위해서 비동기 오프셋 커밋을 사용할 수 있다.
+- 메서드는 commyAsync()
+
+```java
+while(true) {
+  ConsumerRecords<String, String> records = consumer.poll(Duration.ofSeconds(1));
+  ...(생략)...
+  consumer.commitAsync();
+}
+```
+- 이것도 poll() 메서드로 리턴된 가장 마지막 레코드를 기준으로 오프셋을 커밋하지만 **커밋이 완료될 때까지 응답을 기다리지 않는다.**
+- callback 함수를 파라미터로 받아서 결과를 얻을 수 있다.
+```java
+consumer.commitAsync(new OffsetCommitCallback() {
+  public void onComplete(Map<TopicPartition, OffsetAndMetadata> offsets, Exception e) {
+  if (e != null)
+    System.err.printIn("Commit failed");
+  else
+    System.out.printIn("Commit succeeded"); // 정상 커밋
+  if (e != null)
+    logger.error ("Commit failed for offsets 0)", offsets, e);
+  }
+});
+```
+- OffsetCommitCallback 함수는 commitAsync()의 응답을 받을 수 있도록 도와주는 콜백 인터베이스다.
+- 비동기로 받은 커밋 응답은 onComplete() 메서드를 통해 확인할 수 있다.
+- 정상 커밋되면 Exception 변수가 null이고, 오프셋 정보가 Map<TopicPartition, OffsetAndMetadata>에 포함되어 있다.
+
+#### 리밸런스 리스너를 가진 컨슈머
