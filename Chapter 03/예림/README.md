@@ -357,3 +357,14 @@ consumer.commitAsync(new OffsetCommitCallback() {
 - 정상 커밋되면 Exception 변수가 null이고, 오프셋 정보가 Map<TopicPartition, OffsetAndMetadata>에 포함되어 있다.
 
 #### 리밸런스 리스너를 가진 컨슈머
+- 컨슈머 그룹에서 컨슈머가 추가 또는 제거되면 리밸런스(파티션을 컨슈머에 재할당)가 일어난다.
+- poll() 메서드를 통해 반환받은 데이터 처리 전에 리밸런스가 발생하면 데이터를 중복 처리할 수 있다.
+- 리밸런스 발생 시 데이터를 중복 처리하지 않게 하기 위해서는 리밸런스 발생 시 처리한 데이터를 기준으로 커밋을 시도해야 한다.
+- 리밸런스 감지를 위해 카프카 라이브러리는 ConsumerRebalanceListner 인터페이스를 지원한다.
+  - onPartitioinAssigned : 리밸런스가 끝난 뒤에 파티션이 할당 완료되면 호출되는 메서드
+  - onPartitionRevoked : 리밸런스가 시작되기 직전에 호출되는 메서드
+ 
+#### 파티션 할당 컨슈머
+- 컨슈머를 운영할 때 구독 형태로 사용하는 것 외에도 직접 파티션을 컨슈머에 명시적으로 할당 가능
+- assign 메서드 사용
+  - 다수의 TopicPartition 인스턴스를 지닌 자바 컬렉션 타입을 파라미터로 받는다.
