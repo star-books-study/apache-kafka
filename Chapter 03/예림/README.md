@@ -368,3 +368,4 @@ consumer.commitAsync(new OffsetCommitCallback() {
 - 컨슈머를 운영할 때 구독 형태로 사용하는 것 외에도 직접 파티션을 컨슈머에 명시적으로 할당 가능
 - assign 메서드 사용
   - 다수의 TopicPartition 인스턴스를 지닌 자바 컬렉션 타입을 파라미터로 받는다.
+    TopicPartition : 카프카 라이브러리 내/외부에서 사용되는 토픽, 파티션의 정보를 담는 객체로 사용된다.
