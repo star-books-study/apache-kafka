@@ -534,3 +534,38 @@ KafkaStreams streaming = new KafkaStreams(topology, props);
 - 소스커넥터 : 소스 애플리케이션 또는 소스파일로부터 데이터를 가져와 토픽으로 넣는 역할
 - 직접 구현한 소스 커넥터를 빌드 -> jar 파일로 생성 -> 커넥트 실행 시 플러그인으로 추가하여 사용
 ![alt text](image-20.png)
+- 소스커넥터를 만들 때 필요한 클래스 : SourceConnector, SourceTask
+  - `SourceConnector` : 태스크 실행 전, 커넥터 설정 파일을 초기화하고 어떤 태스크 클래스를 사용할 것인지 정의하는 데에 사용됨
+  - `SourceTask` : 실제 데이터를 다루는 클래스
+    - **소스 애플리케이션 또는 소스파일로부터 데이터를 가져와서, 토픽으로 데이터를 보내는 역할 수행**
+    - 특징 : 토픽에서 사용하는 오프셋이 아닌 자체적으로 사용하는 오프셋 사용 -> 이 오프셋을 통해 데이터를 중복해서 토픽으로 보내는 것 방지 가능
+```java
+public class TestSourceConnector extends SourceConnector {
+  
+  @Override
+  public void start(Map<String, String> props) {}
+  // 사용자가 JSON or config 파일 형태로 입력한 설정값을 초기화하는 메서드
+  // 올바른 값이 아니라면, ConnectException() 을 호출하여 커넥터 종료 가능
+}
+
+public class TestSourceTask extends SourceTask {
+
+  @Override
+  public void start(Map<String, String> props) {}
+  // 태스크는 실질적으로 데이터를 처리하는 역할을 하므로, 데이터 처리에 필요한 모든 리소스를 여기서 초기화
+
+  @Override
+  public List<SourceRecord> poll() {}
+  // 소스 애플리케이션 혹은 소스파일로부터 데이터를 읽어오는 로직 작성
+  // SourceRecord 클래스는 토픽으로 데이터를 정의하기 위해 사용
+  // List<SourceRecord> 인스턴스에 데이터 담아 리턴하면 데이터가 토픽으로 전송됨
+
+  @Override
+  public void stop() {}
+}
+```
+
+#### 파일 소스 커넥터 구현
+- 카프카 커넥터를 직접 개발하고 플러그인으로 커넥트에 추가 시 주의할 점은, **사용자가 직접 작성한 클래스뿐만 아니라 참조하는 라이브러리도 함께 빌드하여 jar 로 압축해야 한다**
+- 커넥터 개발 시 옵션 중요도를 Importance enum 클래스로 지정할 수 있다
+  - 반드시 사용자 입력 설정이 필요하면 HIGH, 입력값이 없어도 무방하고 기본값이 있을 경우 MEDIUM, 사용자의 입력값이 없어도 될 경우 LOW 로 지정
