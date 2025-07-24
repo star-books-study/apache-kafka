@@ -372,3 +372,4 @@ consumer.commitAsync(new OffsetCommitCallback() {
 - subscribe 메서드가 아닌 assign 메서드 사용
 
 #### 컨슈머에 할당된 파티션 확인 방법
+- assignment ㅁㅔ서드로 확인 가능
