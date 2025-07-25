@@ -372,4 +372,14 @@ consumer.commitAsync(new OffsetCommitCallback() {
 - subscribe 메서드가 아닌 assign 메서드 사용
 
 #### 컨슈머에 할당된 파티션 확인 방법
-- assignment ㅁㅔ서드로 확인 가능
+- assignment() 메서드로 확인 가능
+- assignment() 메서드는 Set<TopicPartition> 인스턴스를 반환함
+    - TopicPartition : 토픽 번호와 파티션 번호가 포함된 객체
+```kotlin
+KafkaConsumer<String, String> consumer = new KafkaConsumer<>(configs);
+consumer.subscribe(Arrays.asList(TOPIC_NAME));
+Set<TopicPartition> assignedTopicPartition = consumer.assignment();
+```
+
+#### 컨슈머의 안전한 종료
+- 
