@@ -580,3 +580,4 @@ public class TestSourceTask extends SourceTask {
 
 ### 3.6.2. 싱크 커넥터
 - 싱크 커넥터는 토픽의 데이터를 타깃 애플리케이션 또는 타깃 파일로 저장하는 역할을 한다
+- SinkTask 가 커넥트에서 컨슈머 역할을 하고 데이터를 실제로 저장하는 처리 로직을 가진다s
