@@ -497,6 +497,7 @@ KafkaStreams streaming = new KafkaStreams(topology, props);
 ## 3.6. 카프카 커넥트
 - 카프카 커넥트 : 카프카 오픈소스에 포함된 툴 중하나, **데이터 파이프라인 생성 시 반복 작업을 줄이고 효율적인 전송을 하기 위한 애플리케이션**
 - 커넥터는 프로듀서 역할의 `소스 커넥터`, 컨슈머 역할의 `싱크 커넥터`로 나뉜다
+  - ex. 파일을 주고받는 용도로 파일 소스 커넥터, 파일 싱크 커넥터가 있다고 가정하자. <br> 파일 소스 커넥터 : 파일데이터 -> 카프카 토픽으로 전송하는 `프로듀서` 역할 <br> 파일 싱크 커넥터 : 토픽의 데이터 -> 파일로 저장하는 `컨슈머` 역할
 - **MySQL, S3, MongoDB 등과 같은 저장소를 대표적인 싱크 애플리케이션, 소스 애플리케이션이라 볼 수 있다**
 
 ![alt text](image-15.png)
@@ -580,4 +581,55 @@ public class TestSourceTask extends SourceTask {
 
 ### 3.6.2. 싱크 커넥터
 - 싱크 커넥터는 토픽의 데이터를 타깃 애플리케이션 또는 타깃 파일로 저장하는 역할을 한다
-- SinkTask 가 커넥트에서 컨슈머 역할을 하고 데이터를 실제로 저장하는 처리 로직을 가진다s
+- SinkTask 가 커넥트에서 컨슈머 역할을 하고 데이터를 실제로 저장하는 처리 로직을 가진다
+```java
+public class TestSinkTask extends SinkTask {
+
+  @Override
+  public void put(Collection<SinkRecord> records) {}
+  // 싱크 애플리케이션 또는 싱크 파일에 저장할 데이터를 토픽에서 주기적으로 가져오는 메소드
+  // 토픽의 데이터를 여러 개의 SinkRecord 로 묶어 파라미터로 사용할 수 있다
+
+  @Override
+  public void flush(Map<TopicPartition, OffsetAndMetadata> offsets) {}
+  // put() 을 통해 가져온 데이터를 일정 주기로 싱크 애플리케이션 또는 싱크 파일에 저장할 때 사용하는 로직
+  // ex. JDBC 커넥션을 맺어서 MySQL 에 데이터를 저장할 때 put() 에서는 데이터를 insert 하고, flush() 에서는 commit 을 수행하여 트랜잭션을 끝낼 수 있다
+}
+```
+- SinkRecord 는 토픽의 레코드이며 토픽, 파티션, 타임스탬프 정보를 포함한다
+```java
+@Override
+public void put(Collection<SinkRecord> records) {
+  try { 
+    for (SinkRecord record : records) { 
+      fileWriter.write(record.value().toString() + "\n");
+    } 
+  } catch (IOException e) { 
+    throw new ConnectException(e.getMessage(), e);
+  } 
+}
+
+@Override 
+public void flush(Map<TopicPartition, OffsetAndMetadata> offsets) {
+  try { 
+    fileWriter.flush();
+  } catch (IOException e) { 
+    throw new ConnectException(e.getMessage(), e);
+  }
+}
+```
+- put() 에서 파일에 데이터를 저장하는 것 == 버퍼에 데이터 저장하는 것.
+- 실질적으로 파일시스템에 데이터 저장하려면 FileWriter 클래스의 flush() 를 호출해야 한다
+
+## 3.7. 카프카 미러메이커2
+- 카프카 미러메이커2 : 서로 다른 두 개의 카프카 클러스터 간에 토픽을 복제하는 애플리케이션
+  - 프로듀서, 컨슈머를 사용해서 직접 미러링하는 애플리케이션을 만들면 되지만 **굳이 미러메이커2를 사용하는 이유는 토픽의 모든 것을 복제할 필요성이 있기 때문**
+  - **토픽의 데이터를 복제할 뿐만 아니라, 토픽 설정 (ex. 파티션 정보) 까지도 복제하여 파티션의 변화, 토픽 설정값의 변화도 동기화하는 기능을 가진다**
+
+#### 미러메이커2를 활용한 단방향 토픽 복제
+
+
+### 3.7.1. 미러메이커2를 활용한 지리적 복제 (Geo-Replication)
+
+
+## 3.8. 정리
