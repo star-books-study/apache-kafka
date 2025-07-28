@@ -382,4 +382,16 @@ Set<TopicPartition> assignedTopicPartition = consumer.assignment();
 ```
 
 #### 컨슈머의 안전한 종료
+- 컨슈머를 안전하게 종료하기 위해 KafkaConsumer 클래스는 wakeup() 메서드를 지원한다.
+- wakeup() 메서드가 실행된 이후 poll() 메서드가 호출되면 WakeupException 예외가 발생한다.
+- WakeupException 예외를 받은 뒤에는 데이터 처리를 위해 사용된 자원들을 해제하면 된다.
+- 마지막에는 clos() 메서드를 호출하여 컨슈머가 안전하게 종료되었음을 명시적으로 알려주면 종료 완료
+
+<img width="424" height="254" alt="스크린샷 2025-07-28 오후 11 25 55" src="https://github.com/user-attachments/assets/441fce8e-0e2f-4e34-bf4c-a3190b22845f" />
+
+- wakeup 메서드는 어디서 호출하면 될까?
+- 자바 애플리케이션의 경우 코드 내부에서 셧다운 훅을 구현하여 안전한 종료를 명시적으로 구현할 수 있다.
+<img width="433" height="191" alt="스크린샷 2025-07-28 오후 11 26 40" src="https://github.com/user-attachments/assets/d4af5a37-2082-4855-9e5e-a4af827f45cc" />
+
+### 3.4.3 어드민 API
 - 
