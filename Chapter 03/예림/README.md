@@ -394,4 +394,14 @@ Set<TopicPartition> assignedTopicPartition = consumer.assignment();
 <img width="433" height="191" alt="스크린샷 2025-07-28 오후 11 26 40" src="https://github.com/user-attachments/assets/d4af5a37-2082-4855-9e5e-a4af827f45cc" />
 
 ### 3.4.3 어드민 API
-- 
+- 카프카 클라이언트에서는 내부 옵션들을 설정하거나 조회하기 위해 AdminClient 클래스를 제공한다. AdminClient 클래스를 활용하면 클러스터의 옵션과 관련된 부분을 자동화할 수 있다.
+
+```java
+AdminClient admin = AdminClient.create(configs);
+```
+
+- 프로듀서 API 또는 컨슈머 API와 다르게 추가 설정 없이 클러스터 정보에 대한 설정만 하면 된다.
+- create() 메서드로 KafkaAdminClient를 반환 받는다.
+- KafkaAdminClient는 브로커들의 옵션들을 확인, 설정할 수 있는 유틸 클래스다.
+
+## 3.5 카프카 스트림즈
