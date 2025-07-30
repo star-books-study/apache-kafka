@@ -405,3 +405,4 @@ AdminClient admin = AdminClient.create(configs);
 - KafkaAdminClient는 브로커들의 옵션들을 확인, 설정할 수 있는 유틸 클래스다.
 
 ## 3.5 카프카 스트림즈
+- 카프카 스트림즈 : 토픽에 적재된 데이터를 상태기반 또는 비상태 기반으로 실시간 변환해 다른 토픽에 적재하는 라이브러리
