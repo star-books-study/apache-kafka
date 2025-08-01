@@ -438,5 +438,30 @@ AdminClient admin = AdminClient.create(configs);
     - 일정한 시간 간격으로 데이터 처리
 
 ### 3.5.1 스트림즈DSL
-- 스트림즈
+- 스트림즈DSL에는 레코드의 흐름을 추상화한 3가지 개념인 KStream, KTable, GlobalTable이 있다.
 
+#### KStream
+- 메시지 키와 값으로 구성되어 있고, KStream으로 데이터를 조회하면 **토픽에 존재하는 모든 레코드가 출력된다.**
+- 컨슈머로 토픽을 구독하는 것과 동일한 선상에서 사용
+<img width="235" height="225" alt="스크린샷 2025-08-01 오후 11 55 28" src="https://github.com/user-attachments/assets/e394f908-4e08-4ac8-b1bf-ca1178020806" />
+
+#### KTable
+- KStream과 다르게 **메시지 키를 기준으로 묶어서 사용**
+- 유니크한 메시지 키를 기준으로 가장 최신 레코드를 사용
+<img width="369" height="238" alt="스크린샷 2025-08-01 오후 11 56 05" src="https://github.com/user-attachments/assets/e8f2429d-1a62-4d3c-92d6-9085e068679c" />
+
+#### GlobalKTable
+- KTable과 동일하게 **메시지 키를 기준으로 묶어서 사용**
+- 그러나 KTable로 선언된 토픽은 1개 파티션이 1개 데스크에 할당되어 사용되고, GlobalKTable로 선언된 토픽은 모든 파티션 데이터가 각 데스크에 할당되어 사용됨
+- 데이터 조인을 수행할 때가 가장 좋은 예
+  <img width="301" height="164" alt="스크린샷 2025-08-01 오후 11 57 30" src="https://github.com/user-attachments/assets/74cdf2b5-01a2-49cd-b65e-141212761883" />
+
+- 코파티셔닝 되어있지 않은 2개의 토픽을 조인하는 로직이 담긴 스트림즈 애플리케이션을 실행하면 TopologyException이 발생함
+- 조인을 수행하는 KStream과 KTable이 코파티셔닝되어 있지 않으면 KStream 또는 KTable을 리파티셔닝하는 과정을 거쳐야 함
+  - 새로운 토픽에 메시지 키를 가지도록 재배열하는 과정
+ 
+<img width="341" height="163" alt="스크린샷 2025-08-01 오후 11 58 11" src="https://github.com/user-attachments/assets/24855971-60dc-43e1-98fa-1481108b2e98" />
+
+- 코파티셔닝 되어 있지 않은 KStream과 KTable을 조인해서 사용하고 싶다면 KTable을 GlobalKTable로 선언하면 됨
+- 다만 GlobalKTable로 정의된 모든 데이터를 저장하고 사용하기 때문에 로컬 스토리지 사용량이 네트워크, 브로커에 부하가 생길 수 있으므로 작은 용량에만 사용 권장
+  
