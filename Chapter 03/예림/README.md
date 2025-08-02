@@ -464,4 +464,131 @@ AdminClient admin = AdminClient.create(configs);
 
 - 코파티셔닝 되어 있지 않은 KStream과 KTable을 조인해서 사용하고 싶다면 KTable을 GlobalKTable로 선언하면 됨
 - 다만 GlobalKTable로 정의된 모든 데이터를 저장하고 사용하기 때문에 로컬 스토리지 사용량이 네트워크, 브로커에 부하가 생길 수 있으므로 작은 용량에만 사용 권장
-  
+
+#### 스트림즈 DSL - stream(), to()
+- 특정 토픽을 KStream 형태로 가져오려면 스트림즈DSL의 stream() 메서드를 사용하면 된다.
+  - 소스 프로세서
+- KStream의 데이터를 특정 토픽으로 저장하려면 스트림즈DSL의 to() 메서드를 사용한다.
+  - 싱크 프로세서
+```java
+KStream<String, String> streamLog = builder.stream(STREAM_LOG); // stream_log 토픽으로부터 KStream 토픽을 만들기 위해 stream() 메서드 사용
+streamLog.to(STREAM_LOG_COPY); // stream_log 토픽을 담은 KStream 객체를 다른 토픽으로 전송하기 위해 to() 메서드 사용
+```
+
+#### 스트림즈DSL - filter()
+- 메시지 키 또는 메시지 값을 필터링하여 특정 조건에 맞는 데이터를 골라낼 때는 filter() 메서드를 사용하면 된다.
+<img width="385" height="309" alt="스크린샷 2025-08-02 오후 11 10 10" src="https://github.com/user-attachments/assets/c18831b3-7b54-4137-a03d-3bf39290503e" />
+- filter() 메서드는 Predicate를 파라미터로 받는다.
+
+```java
+KStream<String, String> filtereStream = streamLog.filter((key, value) -> value.length() > 5);
+filteredStream.to(STREAM_LOG_FILTER);
+```
+- 더 간소화된 표현 형태(플루언트 인터페이스 스타일)로 작성 가능
+```java
+streamLog.filter((key, value) -> value.length() > 5).to(STREAM_LOG_FILTER);
+```
+
+#### 스트림즈DSL - KTable과 KStream을 join
+- 카프카에서는 실시간으로 들어오는 데이터를 조인할 수 있다.
+- KTable과 KStream을 소스 프로세서로 가져와서 조인을 수행하는 스트림 프로세서를 거쳐 특정 토픽에 싱크 프로세서로 저장하는 로직을 구현해보자.
+<img width="272" height="244" alt="스크린샷 2025-08-02 오후 11 13 07" src="https://github.com/user-attachments/assets/848b97a9-1259-4018-bf3a-36c338d7863d" />
+
+- KTable로 사용할 토픽과 KStream으로 사용할 토픽을 만들 때 둘 다 파티션을 3개로 동일하게 만든다. 파티셔닝 전략은 기본 파티셔너를 사용한다.
+
+> KStream, KTable, GlobalKTable 모두 동일한 토픽이고 다만, 스트림즈 애플리케이션 내부에서 사용할 때 메시지 키와 값을 사용하는 형태를 구분할 뿐인 것이다.
+
+
+```java
+// KStream과 KTable에서 동일한 메시지키를 가진 데이터를 찾았을 경우 각가의 메시지 값을 조합해서 어떤 데이터를 만들지 정의한다.
+orderStream.join(addressTable, (order, address) -> order + " send to " + address).to(ORDER_JOIN_STREAM);
+```
+<img width="389" height="224" alt="스크린샷 2025-08-02 오후 11 15 41" src="https://github.com/user-attachments/assets/3d40dd9a-195f-455f-9bae-f7676408487f" />
+
+#### 스트림즈DSL - GlovalTable과 KStream을 join
+- 코파티셔닝되지 않은 데이털르 조인하는 두 가지 방법
+  - 리파티셔닝
+  - GlobalKTable로 선언하기
+- GlobalKTable로 선언하는 방법을 알아보자.
+  - 토폴로지
+    <img width="309" height="253" alt="스크린샷 2025-08-02 오후 11 16 42" src="https://github.com/user-attachments/assets/0895c381-1b41-42a8-a440-5672fb062bab" />
+
+```java
+// GlobalKTable은 KTable의 조인과 다르게 레코드를 매칭할 떄 KStream의 메시지 키와 메시지 값 둘 다 사용할 수 있다. 여기서는 KStream의 메시지 키를 GlobalKTable의 메시지 키와 매칭하도록 설정했다.
+orderStream.join(addressGlobalTable, (orderKey, orderValue) -> orderKey, (order, address) -> order + " send to " + address).to(ORDER_JOIN_STREAM);
+```
+- 결과물을 보면 KTable과 크게 달라보이지 않지만, GlobalKTable로 선언한 토픽은 토픽에 존재하는 모든 데이터를 태스크마다 저장하고 조인 처리를 수행하는 점이 다르다.
+- 그리고 조인을 수행할 때 KStream의 메시지 키 뿐만 아니라 메시지 값을 기준으로도 매칭하여 조인할 수 있다는 점도 다르다.
+
+### 3.5.2 프로세서 API
+- 프로세서 API는 스트림즈DSL보다 투박한 코드를 가지지만 토폴로지를 기준으로 데이터를 처리한다는 관점에서 동일한 역할을 한다.
+- 추가적인 상세 로직 구현이 필요하다면 프로세서 API를 활용할 수 있다. 프로세서 API에서는 스트림즈DSL에서 사용했던 KStream, KTable, GlobalKtable 개념이 없다는 점을 주의해야 한다.
+```java
+public class FilterProcessor implements Processor<String, String, String, String> {
+
+    private ProcessorContext context;
+
+    @Override
+    public void init(ProcessorContext<String, String> context) {
+        this.context = context;
+    }
+
+    @Override
+    public void process(Record<String, String> record) { // 실질적으로 프로세싱 로직이 들어가는 부분
+        if (record.value().length() > 5){ // 메시지값이 5 이상인 경우를 필터링하여 처리
+            context.forward(record);
+        }
+        context.commit(); // 명시적으로 데이터가 처리되었음을 선언
+    }
+
+    @Override
+    public void close() {
+    }
+}
+```
+```java
+// 사용
+public class SimpleKafkaProcessor {
+
+    private final static String BOOTSTRAP_SERVERS = "localhost:9092";
+    private final static String APPLICATION_NAME = "processor-application";
+    private final static String STREAM_LOG = "test";
+    private final static String STREAM_LOG_COPY = "stream_log_copy";
+
+    public static void main(String[] args) {
+        var props = new Properties();
+        props.put(StreamsConfig.APPLICATION_ID_CONFIG, APPLICATION_NAME);
+        props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS);
+        props.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG,
+                Serdes.String().getClass());
+        props.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG,
+                Serdes.String().getClass());
+
+        var topology = new Topology();
+
+        topology.addSource("Source", STREAM_LOG)
+                .addProcessor("Process",
+                        () -> new FilterProcessor(),
+                        "Source")
+                .addSink("Sink",
+                        STREAM_LOG_COPY,
+                        "Process");
+
+        var streaming = new KafkaStreams(topology, props);
+        streaming.start();
+    }
+}
+```
+- 스트림 프로세서를 사용하기 위해 addProcessor() 메서드를 사용
+- addProcessor() 메서드의 첫 번째 파라미터는 스트림 프로세서의 이름을 입력한다.
+- 두 번쨰 파라미터는 사용자가 정의한 프로세서 인스턴스를 입력한다.
+- 세 번째 파라미터는 부모 노드를 입력해야 하는데 여기서 부모 노드는 "Source"이다.
+- stream_log_filter를 싱크 프로세서로 사용하여 데이터를 저장하기 위해 addSink() 메서드를 사용했다. 첫 번째 파라미터는 싱크 프로세서의 이름을 입력한다. 두 번째 파라미터는 저장할 토픽의 이름을 입력한다. 세 번째는 부모 노드를 입력하는데 필터링 처리가 완료된 데이터를 저장해야 하므로 "Process"다.
+
+
+## 3.6 카프카 커넥트
+- 카프카 오픈소스에 포함된 둘 중 하나로 데이터 파이프라인 생성 시 반복 작업을 줄이고 효율적인 전송을 이루기 위한 애플리케이션
+- 특정한 작업 형태를 템플릿으로 만들어놓은 커넥터를 실행함으로써 반복 작업을 줄일 수 있다.
+- 커넥터는 **프로듀서** 역햘을 하는 `소스 커넥터`와 **컨슈머** 역할을 하는 `싱크 커넥터` 두 가지로 나뉜다.
+- <img width="267" height="152" alt="스크린샷 2025-08-02 오후 11 25 22" src="https://github.com/user-attachments/assets/46ec665f-ca7c-4e7b-b5c0-45b44b5daae5" />
+
