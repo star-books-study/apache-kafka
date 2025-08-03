@@ -591,4 +591,306 @@ public class SimpleKafkaProcessor {
 - 특정한 작업 형태를 템플릿으로 만들어놓은 커넥터를 실행함으로써 반복 작업을 줄일 수 있다.
 - 커넥터는 **프로듀서** 역햘을 하는 `소스 커넥터`와 **컨슈머** 역할을 하는 `싱크 커넥터` 두 가지로 나뉜다.
 - <img width="267" height="152" alt="스크린샷 2025-08-02 오후 11 25 22" src="https://github.com/user-attachments/assets/46ec665f-ca7c-4e7b-b5c0-45b44b5daae5" />
+- 사용자가 커넥트에 커넥터 생성 명령을 내리면 커넥트는 내부에 커넥터와 태스크 생성
+  <img width="324" height="159" alt="스크린샷 2025-08-03 오후 11 27 29" src="https://github.com/user-attachments/assets/ad97857e-a139-4f22-9d9e-f8fa13e4a613" />
+
+- 사용자가 커넥터를 사용하여 파이프라인을 생성할 때 컨버터와 트랜스폼 기능을 옵션으로 추가할 수 있다.
+- 컨버터는 데이터 처리를 하기 전에 스키마를 변경하도록 도와준다.
+- 트랜스폼은 데이터 처리 시 각 메시지 단위로 데이터를 간단하게 변환하기 위한 용도로 사용된다.
+
+
+### 커넥트를 실행하는 방법
+- 커넥트를 실행하는 방법은 크게 두 가지가 있다.
+  - 단일 모드 커넥트
+  - 분산 모드 커넥트
+
+#### 단일 모드 커넥트
+- `connect-standalone.properties` 파일을 수정해야 함
+- 해당 파일은 카프카 바이너리 디렉토리의 config 디렉토리에 있음
+```properties
+# 커넥트와 연동할 카프카 클러스터의 호스트와 포트 설정
+# 2개 이상일땐 콤마로 구분하여 설정
+bootstrap.servers=my-kafka:9092
+
+# 데이터를 카프카에 저장할 때나 가져올 때 변환할 때 사용
+key.converter=org.apache.kafka.connect.json.JsonConverter
+value.converter=org.apache.kafka.connect.json.JsonConverter
+
+# 스키마 형태를 사용하고 싶지 않다면 enable 옵션을 false로 설정
+key.converter.schemas.enable=false
+value.converter.schemas.enable=false
+
+# 태스크가 처리 완료한 오프셋을 커밋하는 주기를 설정
+offset.storage.file.filename=/tmp/connect.offsets
+offset.flush.interval.ms=10000
+
+# 플러그인 형태로 추가할 커넥터의 디렉토리 주소를 입력
+plugin.path=/usr/local/share/java,/usr/local/share/kafka/plugins,/opt/connectors,
+#plugin.path=
+```
+- 단일 모드 커넥트를 실행 시에 파라미터로 커넥트 설정파일과 커넥터 설정파일을 차례로 넣어 실행한다.
+```bash
+$ bin/connect-standalone.sh config/connect-standalone.properties \
+config/connect-file-source.properties
+```
+
+#### 분산 모드 커넥트
+- 분산 모드 커넥트는 단일 모드 커넥트와 다르게 2개 이상의 프로세스가 1개의 그룹으로 묶여 운영된다.
+- 1개의 커넥트 프로세스에 이슈 발생하여도 살아있는 나머지 1개 커넥트 프로세스가 이어받아 파이프라인을 지속적으로 실행할 수 있다.
+- connect-distributed.properties 를 아래와 같이 설정한다.
+```properties
+bootstrap.servers=my-kafka:9092
+# 다수의 커넥트 프로세스들을 묶을 그룹 이름 지정.
+# 동일한 group.id로 지정된 커넥트들은 같은 그룹으로 인식한다.
+# 같은 그룹으로 지정된 커넥트들에서 커넥터가 실행되면 커넥트들에 분산되어 실행된다.
+# 한 대에 이슈가 발생하더라도 나머지 커넥트가 커넥터를 안전하게 실행할 수 있다.
+group.id=connect-cluster
+
+key.converter=org.apache.kafka.connect.json.JsonConverter
+value.converter=org.apache.kafka.connect.json.JsonConverter
+
+key.converter.schemas.enable=false
+value.converter.schemas.enable=false
+
+# 분산 모드 커넥트는 카프카 내부 토픽에 오프셋 정보를 저장한다.
+# 오프셋 정보는 소스 커넥터 또는 싱크 커넥터가 데이터 처리 시점을 저장하기 위해 사용한다.
+# 해당 정보는 데이터를 처리하는 데에 있어 중요한 역할을 하므로 실제로 운영할 때는 복제 개수를 3보다 큰 값으로 설정하는 것이 좋다.
+offset.storage.topic=connect-offsets
+offset.storage.replication.factor=1
+
+config.storage.topic=connect-configs
+config.storage.replication.factor=1
+
+status.storage.topic=connect-status
+status.storage.replication.factor=1
+
+# 태스크가 처리 완료한 오프셋을 커밋하는 주기를 설정한다.
+offset.flush.interval.ms=10000
+
+plugin.path=/usr/local/share/java,/usr/local/share/kafka/plugins,/opt/connectors,
+```
+- 실행
+  ```bash
+  $ bin/connect-distributed.sh config/connect-distributed.properties
+  ```
+
+### 3.6.1 소스 커넥터
+- 소스 커넥터는 소스 애플리케이션 또는 소스 파일로부터 데이터를 가져와 토픽으로 넣는 역할을 한다.
+- 소스 커넥터를 만들 때는 connect-api 라이브러리를 추가해야 한다.
+- 소스 커넥터를 만들 때 필요한 클래스는 2개다.
+  - SourceConnector : 태스크를 실행하기 전 커넥터 설정파일을 초기화하고 어떤 태스크 클래스를 사용할 것인지 정의하는 데에 사용한다. 그렇기 때문에 SourceConnector에는 실질적인 데이터를 다루는 부분이 들어가지 않는다.
+  - SourceTask : 실제로 데이터를 다루는 클래스로, 소스 애플리케이션 또는 소스 파일로부터 데이터를 가져와서 토픽으로 데이터를 보내는 역할을 수행한다.
+<img width="211" height="143" alt="스크린샷 2025-08-03 오후 11 40 55" src="https://github.com/user-attachments/assets/d452b4b3-f0d8-4e5f-a359-d53fe6fa62c6" />
+
+- 먼저, SourceConnector를 상속받은 사용자의 클래스를 생성해야 한다.
+  ```java
+  public class TestSourceConnector extends SourceConnector {
+    
+    // 사용자가 JSON 또는 config 파일 형태로 입력한 설정값을 초기화하는 메서드다.
+    // 만약 올바른 값이 아니라면 여기서 ConnectException()을 호출하여 커넥터를 종료할 수 있다.
+    // 예를 들어, JDBC 소스 커넥터라면 JDBC 커넥션 URL값을 검증하는 로직을 넣을 수 있다.
+    // 만약 비정상적인 URL값이라면 커넥션을 맺을 필요 없이 커넥터를 종료시킬 수 있다.
+    @Override
+    public void start(Map<String, String> map) {
+
+    }
+
+    // 이 커넥터가 사용할 태스크 클래스를 지정한다.
+    @Override
+    public Class<? extends Task> taskClass() {
+        return null;
+    }
+
+    // 태스크 개수가 2개 이상인 경우 태스크마다 각기 다른 옵션을 설정할 때 사용한다.
+    @Override
+    public List<Map<String, String>> taskConfigs(int i) {
+        return List.of();
+    }
+
+    // 커넥터가 종료될 때 필요한 로직을 작성한다.
+    @Override
+    public void stop() {
+
+    }
+
+    // 커넥터가 사용할 설정값에 대한 정보를 받는다.
+    // 커넥터의 설정값은 ConfigDef 클래스를 통해 각 설정의 이름, 기본값, 중요도, 설명을 정의할 수 있다.
+    @Override
+    public ConfigDef config() {
+        return null;
+    }
+
+    // 커넥터의 버전을 리턴한다.
+    // 커넥트에 포함된 커넥터 플러그인을 조회할 때 이 버전이 노출된다.
+    // 커넥터를 지속적으로 유지보수하고 신규 배포할 때 이 메서드가 리턴하는 버전 값을 변경해야 한다.
+    @Override
+    public String version() {
+        return "";
+    }
+  }
+  ```
+- SourceTask를 상속받은 사용자 클래스는 4개 메서드를 구현해야 한다.
+  ```java
+  public class TestSourceTask extends SourceTask {
+    
+    // 태스크의 버전을 저장한다.
+    // 보통 커넥터의 version() 메서드에서 지정한 버전과 동일한 버전으로 작성하는 것이 일반적이다.
+    @Override
+    public String version() {
+        return "";
+    }
+
+    // 태스크가 시작할 때 필요한 로직을 작성한다.
+    // 태스크는 실질적으로 데이터를 처리하는 역할을 하므로 데이터 처리에 필요한 모든 리소스를 여기서 초기화하면 좋다.
+    // 예를 들어, JDBC 소스 커넥터를 구현한다면 이 메서드에서 JDBC 커넥션을 맺는다.
+    @Override
+    public void start(Map<String, String> map) {
+        
+    }
+
+    // 소스 애플리케이션 또는 소스 파일로부터 데이터를 읽어오는 로직을 작성한다.
+    // 데이터를 읽어오면 토픽으로 보낼 데이터를 SourceRecord로 정의한다.
+    // SourceRecord클래스는 토픽으로 데이터를 정의하기 위해 사용한다.
+    // List<SourceRecord> 인스턴스에 데이터를 담아 리턴하면 데이터가 토픽으로 전송된다.
+    @Override
+    public List<SourceRecord> poll() throws InterruptedException {
+        return List.of();
+    }
+
+    // 태스크가 종료될 때 필요한 로직을 작성한다.
+    // JDBC 소스 커넥터를 구현했다면 이 메서드에서 JDBC 커넥션을 종료하는 로직을 추가하면 된다.
+    @Override
+    public void stop() {
+
+    }
+  }
+  ```
+### 3.6.2 싣크 커넥터
+- 싱크 커넥터는 토픽의 데이터를 타깃 애플리케이션 또는 타깃 파일로 저장하는 역할을 한다.
+- SinkConnector와 SinkTask 클래스를 사용하면 직접 싱크 커넥터를 구현할 수 있다.
+  <img width="281" height="154" alt="스크린샷 2025-08-03 오후 11 41 12" src="https://github.com/user-attachments/assets/0d7aa071-5558-4bd0-b815-9a25694d1595" />
+- 먼저, SinkConnector를 상속받은 사용자의 클래스를 생성해야 한다.
+  ```java
+  public class TestSinkConnector extends SinkConnector {
+      
+      // 사용자가 JSON 또는 config 파일 형태로 입력한 설정값을 초기화하는 메서드다.
+      // 만약 올바른 값이 아니라면 여기서 ConnectException()을 호출하여 커넥터를 종료할 수 있다.
+      @Override
+      public void start(Map<String, String> map) {
+  
+      }
+  
+      // 이 커넥터가 사용할 태스크 클래스를 지정한다.
+      @Override
+      public Class<? extends Task> taskClass() {
+          return null;
+      }
+  
+      // 태스크 개수가 2개 이상인 경우 태스크마다 각기 다른 옵션을 설정할 때 사용한다.
+      @Override
+      public List<Map<String, String>> taskConfigs(int i) {
+          return List.of();
+      }
+  
+      // 커넥터가 종료될 때 필요한 로직을 작성한다.
+      @Override
+      public void stop() {
+  
+      }
+  
+      // 커넥터가 사용할 설정값에 대한 정보를 받는다.
+      // 커넥터의 설정값은 ConfigDef 클래스를 통해 각 설정의 이름, 기본값, 중요도, 설명을 정의할 수 있다.
+      @Override
+      public ConfigDef config() {
+          return null;
+      }
+  
+      // 커넥터의 버전을 리턴한다.
+      // 커넥트에 포함된 커넥터 플러그인을 조회할 때 이 버전이 노출된다.
+      // 커넥터를 지속적으로 유지보수하고 신규 배포할 때 이 메서드가 리턴하는 버전 값을 변경해야 한다.
+      @Override
+      public String version() {
+          return "";
+      }
+  }
+  ```
+- SinkTask를 상속받은 사용자 클래스는 5개 메서드를 구현해야 한다.
+  ```java
+  public class TestSinkTask extends SinkTask {
+    
+    // 태스크의 버전을 저장한다.
+    // 보통 커넥터의 version() 메서드에서 지정한 버전과 동일한 버전으로 작성하는 것이 일반적이다.
+    @Override
+    public String version() {
+        return "";
+    }
+
+    // 태스크가 시작할 때 필요한 로직을 작성한다.
+    // 태스크는 실질적으로 데이터를 처리하는 역할을 하므로 데이터 처리에 필요한 모든 리소스를 여기서 초기화하면 좋다.
+    // 예를 들어, mongoDB 싱크 커넥터를 구현한다면 이 메서드에서 mongoDB 커넥션을 맺는다.
+    @Override
+    public void start(Map<String, String> map) {
+        
+    }
+
+    // 싱크 애플리케이션 또는 싱크 파일에 저장할 데이터를 토픽에서 주기적으로 가져오는 메서드이다.
+    // 토픽의 데이터들은 여러 개의 SinkRecord를 묶어 파라미터로 사용할 수 있다.
+    // SinkRecord는 토픽의 한 개 레코드이며 토픽, 파티션, 타임스탬프 등의 정보를 담고있다.
+    @Override
+    public void put(Collection<SinkRecord> records) {
+    
+    }
+    
+    // put() 메서드를 통해 가져온 데이터를 일정 주기로 싱크 애플리케이션 또는 싱크 파일에 저장할 때 사용하는 로직이다.
+    // 예를 들어, JDBC 커넥션을 맺어서 MySQL에 데이터를 저장할 때 put() 메서드에서는 데이터를 insert하고 flush() 메서드에서는 commit을 수행하여 트랜잭션을 끝낼 수 있다.
+    // put() 메서드에서 레코드를 저장하는 로직을 넣을 수도 있으며 이 경우에는 flush() 메서드에는 로직을 구현하지 않아도 된다.
+    @Override
+    public void flush(Map<TopicPartition, OffsetAndMetadata> offsets) {
+    
+    }
+
+    // 태스크가 종료될 때 필요한 로직을 작성한다.
+    // 태스크에서 사용한 리소스를 종료해야 할 때 여기에 종료 코드를 구현한다.
+    @Override
+    public void stop() {
+
+    }
+  }
+  ```
+## 3.7 카프카 미러메이커2
+#### 미러메이커2를 활용한 단방향 토픽 복제
+- 서로 다른 카프카 클러스터 간에 토픽을 복제하는 애플리케이션
+- 원본 Kafka 클러스터와 복제할 Kafka 클러스터를 설정
+- MirrorMaker 2의 source.cluster.alias와 target.cluster.alias를 각각 설정하여 원본 클러스터와 복제 클러스터를 지정
+- replication.policy.class를 설정하여 토픽 이름의 변환 규칙을 설정할 수 있다. 예를 들어, org.apache.kafka.connect.mirror.DefaultReplicationPolicy를 사용하면 복제된 토픽의 이름이 원본 클러스터와 동일하게 유지된다.
+- 원본 클러스터에서 발생하는 모든 데이터 변경 사항이 복제 클러스터로 즉시 전송된다.
+- 복제 클러스터는 데이터 소비만 하며, 원본 클러스터로 데이터가 역으로 전송되지 않는다.
+
+### 3.7.1 미러메이커2를 활용한 지리적 복제
+- 지리적 복제는 물리적으로 분리된 여러 데이터 센터 간에 Kafka 데이터를 복제하는 전략이다. 이는 재해 복구, 지연 감소 및 지역별 데이터 소비 요구를 충족하기 위해 필수적이다.
+- 각 지리적 위치에 Kafka 클러스터를 설치하고, MirrorMaker 2를 사용하여 클러스터 간 데이터를 복제
+- 각 지리적 클러스터에 대한 연결 정보를 제공하고, 토픽 및 소비자 그룹을 포함한 메타데이터를 동기화
+- MirrorMaker 2에서 active.active.replication 설정을 통해 양방향 복제 구성도 가능하지만, 지리적 복제에서는 주로 단방향 복제를 많이 사용
+
+- 데이터가 각 지역에 분산되어 있어 특정 지역의 클러스터가 다운되더라도 다른 지역의 클러스터가 데이터 가용성을 유지할 수 있다.
+- 네트워크 지연이 중요한 요소이며, 이를 최소화하기 위한 네트워크 구성 및 데이터 압축 옵션을 고려해야 한다.
+
+
+#### 액티브-스탠바이 클러스터 운영
+액티브-스탠바이 클러스터 운영은 한 클러스터가 주요 작업을 처리하고, 다른 클러스터는 백업 역할을 하는 구조다. 주로 재해 복구 및 고가용성 보장을 위해 사용한다.
+<img width="276" height="108" alt="스크린샷 2025-08-03 오후 11 45 53" src="https://github.com/user-attachments/assets/6f7eab9e-7564-43ef-a793-172f2818a55f" />
+<img width="339" height="113" alt="스크린샷 2025-08-03 오후 11 46 00" src="https://github.com/user-attachments/assets/4df1e0dc-2570-4b2a-a722-f79c51b5c541" />
+
+
+#### 액티브-액티브 클러스터 운영
+
+액티브-액티브 클러스터 운영은 두 개 이상의 클러스터가 동시에 데이터를 처리하고 상호 복제를 통해 일관성을 유지하는 구조다. 이는 고가용성과 데이터 일관성, 그리고 더 나은 성능을 제공하기 위해 사용된다.
+<img width="308" height="99" alt="스크린샷 2025-08-03 오후 11 46 20" src="https://github.com/user-attachments/assets/a63e81eb-2c45-49da-a798-dd49a26d2ec2" />
+
+
+
+#### 허브 앤 스포크 클러스터 운영
+- 허브 앤 스포크 클러스터 운영은 중앙 허브 클러스터가 여러 스포크 클러스터와 데이터를 교환하는 구조다. 이는 중앙 집중형 데이터 수집 및 배포에 유용하다.
+<img width="306" height="130" alt="스크린샷 2025-08-03 오후 11 46 27" src="https://github.com/user-attachments/assets/abf2ab6b-8e79-4855-a263-ab71f47de79a" />
+
 
