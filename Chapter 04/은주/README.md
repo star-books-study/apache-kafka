@@ -1,4 +1,4 @@
-# Chapter 4. 카프카 상세 개념 설명
+'# Chapter 4. 카프카 상세 개념 설명
 
 ## 4.1. 토픽과 파티션
 ### 4.1.1. 적정 파티션 개수
@@ -144,3 +144,146 @@
   - 트랜잭션 레코드는 실질적 데이터 X, 트랜잭션이 끝난 상태를 표시하는 정보만 가짐
   - 트랜잭션 컨슈머는 **커밋이 완료된 데이터가 파티션에 있을 경우에만 데이터를 가져간다.**
     - 만약 데이터만 존재하고 트랜잭션 레코드가 존재하지 않으면 아직 트랜잭션이 완료되지 않았다고 판단하고 데이터를 가져가지 않는다.
+> ✅ 트랜잭션 프로듀서 실사례
+> 1. DB → Kafka 싱크 연동 (CDC, ETL 등)
+>    - DB 커밋됐을 때만 Kafka에도 메시지를 전송하고 싶다.
+> 2. 여러 토픽에 전송할 때 원자성 보장
+>    - **두 개 이상의 토픽에 동시에 메시지를 보내되, 일부만 성공해서는 안 된다.**
+
+## 4.3. 카프카 컨슈머
+### 4.3.1. 멀티 스레드 컨슈머
+- 파티션 개수가 N개라면, 동일 컨슈머 그룹으로 묶인 컨슈머 스레드를 최대 N개 운영할 수 있다
+  - N개의 스레드를 가진 1개 프로세스 운영 or 1개의 스레드를 가진 프로세스 N개 운영
+  - ![](image-6.png)
+  > ❓ **컨슈머 그룹으로 묶지 않고 컨슈머 스레드 여러 개로 운영하면 안되는가?**
+  > - 컨슈머 그룹 없이 개별 컨슈머만 돌리면...
+  >    - 각 컨슈머가 같은 데이터를 중복 소비하거나
+  >    - Kafka가 파티션을 자동으로 할당해주지 않음 (카프카는 **컨슈머 그룹 단위로 파티션 분배**)
+  >    - 처리 순서가 꼬일 수 있음
+  >    - 수평 확장이나 장애 복구가 불가능
+  > - 왜 컨슈머 그룹으로 운영하나?
+  >    - **하나의 파티션은 하나의 컨슈머 그룹 안에서 오직 하나의 컨슈머만 읽을 수 있기 때문에, 메시지 중복 없이 병렬 처리하기 위함**
+  > - 그룹이 다르면?
+  >    - 같은 메시지를 각기 다르게 소비 가능 (멀티 파이프라인)
+  > - 스레드만 여러 개 쓰면?	
+  >    - 파티션 충돌, 중복 소비, 리밸런싱 불가 등 문제 발생
+  > - 결국 "컨슈머 그룹 없이 병렬 처리" = Kafka 설계 철학에 맞지 않는 비권장 패턴
+- 멀티 스레드로 컨슈머를 안전하게 운영하기 위해서는 고려할 부분이 많은데, 하나의 컨슈머 스레드에서 예외 상황 (OOM) 발생 시 프로세스 자체가 종료될 수도 있고, 이는 다른 컨슈머 스레드에까지 영향을 미칠 수 있다
+  - 따라서 **각 컨슈머 스레드 간에 영향을 미치지 않도록 스레드 세이프 로직, 변수를 적용해야 한다**
+- 컨슈머를 멀티 스레드로 활용하는 방식
+  1. `멀티 워커 스레드` 전략 :  **컨슈머 스레드 1개 실행 / 데이터 처리를 담당하는 워커 스레드 여러 개** 실행
+  2. `컨슈머 멀티 스레드` 전략 : **컨슈머 인스턴스에서 poll() 메서드 호출하는 스레드 여러개 띄워서** 사용 
+
+#### 카프카 컨슈머 멀티 워커 스레드 전략
+- 멀티 스레드를 생성하는 ExecutorService 자바 라이브러리를 사용하면 레코드를 병렬처리하는 스레드를 효율적으로 생성하고 관리할 수 있다
+  - 작업 이후 스레드가 종료되어야 한다면 CachedThreadPool을 사용하여 스레드를 실행한다
+    - newCachedThreadPool 은 필요한 만큼 스레드 풀을 늘려서 스레드를 실행하는 방식으로, 짧은 시간의 생명주기를 가진 스레드에서 유용하다
+
+![alt text](image-7.png)
+```java
+public class ConsumerWorker implements Runnable { 
+  private String recordValue;
+  
+  ConsumerWorker(String recordValue) { 
+    this.recordValue = recordValue;
+  }
+
+  @Override public void run() { 
+    logger.info("thread:{}\trecord:{}", Thread.currentThread().getName(), recordValue);
+  } 
+}
+```
+- 데이터를 처리하는 스레드를 개별로 생성하기 위해 **데이터를 처리하는 사용자 지정 스레드를 새로 생성**
+  - Runnable 인터페이스로 구현한 클래스이므로 스레드로 실행되며, 생성되고 나면 run() 메서드가 실행되어 이 메소드에서 데이터가 처리됨
+```java
+KafkaConsumer<String, String> consumer = new KafkaConsumer<>(configs);
+consumer.subscribe(Arrays.asList(TOPIC_NAME));
+ExecutorService executorService = Executors.newCachedThreadPool();
+
+while (true) {
+  ConsumerRecords<String, String> records = consumer.poll(Duration.ofSeconds(10));
+  for (ConsumerRecord<String, String> record : records) {
+    ConsumerWorker worker = new ConsumerWorker(record.value());
+    executorService.execute(worker);
+  }
+}
+```
+- 데이터를 처리하는 ConsumerWorker 클래스로, **poll() 메서드를 통해 리턴받은 레코드들을 처리하는 스레드를 레코드마다 개별 실행한다**
+- 스레드를 사용하면 한번 poll()을 통해 받은 데이터를 `병렬처리` 함으로써 속도의 이점을 확실히 얻을 수 있다. 
+
+주의사항
+1. 스레드를 사용함으로써 **데이터 처리가 끝나지 않았음에도 불구하고 커밋을 하기 때문에 리밸런싱, 컨슈머 장애 시에 데이터 유실이 발생할 수 있다**
+    - 위 코드는 각 레코드의 데이터 처리가 끝났음을 스레드로부터 리턴받지 않고 바로 그 다음 poll() 메서드를 호출한다
+    - **오토 커밋일 경우 데이터 처리가 스레드에서 진행 중임에도 불구하고 다음 poll() 메서드 호출 시에 커밋을 할수 있기 때문에 발생하는 현상**이다. 
+    > ➕ enable.auto.commit = true 일 경우에는 설정된 주기에 따라 KafkaConsumer가 백그라운드 스레드로 커밋을 함. <br> 
+    > 1. 메시지를 poll()로 가져온 후,
+    > 2. 각 레코드를 별도 스레드로 비동기 처리하고,
+    > 3. KafkaConsumer는 그 다음 poll()을 호출
+    > 4. 이 과정에서 자동 커밋이 동작하면, 아직 처리 중인 메시지도 커밋된 것으로 간주됨
+    > - 스레드에서 예외가 발생하거나 처리 도중 종료되면 → 해당 메시지는 처리 실패하지만 커밋되어 다시 처리되지 않음
+    > - 컨슈머가 다운되거나 리밸런싱되면 → 처리 중이던 메시지가 사라짐
+    > 
+    > ✅ 해결 방안
+    > - 수동 커밋 사용 (enable.auto.commit=false)
+    > - 스레드 작업 완료를 추적할 메커니즘 필요
+    >   - ex. Future, CountDownLatch, ExecutorService.invokeAll() 등을 사용해 각 레코드의 처리가 완료된 후에만 커밋하도록 설계
+    > - 처리 결과를 별도 저장소에 기록하는 패턴
+    >   - DB나 로그 저장소에 저장 후, 메시지는 중복 처리 허용 기반으로 설계 (idempotent)
+
+
+1. **레코드 처리의 역전현상**
+   - for 문으로 스레드를 생성하므로 레코드별로 스레드의 생성은 순서대로 진행되지만, 스레드의 처리 시간은 다를 수 있다. 
+   - 나중에 생성된 스레드의 레코드 처리 시간이 더 짧을 경우 이전 레코드가 다음 레코드보다 나중에 처리될 수 있다. 
+   - **레코드 처리에 있어 중복이 발생하거나 데이터의 역전현상이 발생해도 되며 매우 빠른 처리 속도가 필요한 데이터 처리에 적합하다.**
+     - ex. 서버 리소스(CPU, 메모리 등) 모니터링 파이프라인, IoT 서비스의 센서 데이터 수집 파이프라인
+
+#### 카프카 컨슈머 멀티 스레드 전략
+- **토픽의 파티션 개수만큼 컨슈머 스레드 개수를 늘려서 운영하는 것**이다. 
+  - 컨슈머 스레드를 늘려서 운영하면 각 스레드에 각 파티션이 할당되며, 파티션의 레코드들을 병렬처리 할 수 있다.
+
+![alt text](image-8.png)
+
+```java
+public class ConsumerWorker implements Runnable {
+    private final static Logger logger = LoggerFactory.getLogger(ConsumerWorker.class);
+    private Properties prop;
+    private String topic;
+    private String threadName;
+    private KafkaConsumer<String, String> consumer; 
+    // kafkaConsumer 는 스레드 세이프 하지 않은 클래스이므로, 스레드별로 별개의 인스턴스를 만들어서 운영해야 한다
+
+    ConsumerWorker(Properties prop, String topic, int number) {
+        this.prop = prop;
+        this.topic = topic;
+        this.threadName = "consumer-thread-" + number;
+    }
+
+    @Override
+    public void run() {
+        consumer = new KafkaConsumer<>(prop);
+        consumer.subscribe(Arrays.asList(topic));
+        while (true) {
+            ConsumerRecords<String, String> records = consumer.poll(Duration.ofSeconds(1));
+            for (ConsumerRecord<String, String> record : records) {
+                logger.info("{}", record);
+            }
+            consumer.commitSync();
+        }
+    }
+}
+```
+
+```java
+public static void main(String[] args) {
+  Properties configs = new Properties();
+  ...(설정 중략)...
+
+  ExecutorService executorService = Executors.newCachedThreadPool();
+  for (int i = 0; i < CONSUMER_COUNT; i++) {
+    ConsumerWorker worker = new ConsumerWorker(configs, TOPIC_NAME, i);
+    executorService.execute(worker);
+  }
+}
+```
+- 위 코드를 통해 1개의 애플리케이션에 N 개의 컨슈머 스레드를 띄울 수 있다
+- 스레드 하나 당 카프카 컨슈머 1개씩을 담당하여 후처리 및 커밋 로직이 동작한다
