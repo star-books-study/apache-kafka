@@ -422,3 +422,11 @@ public void run(String... args) {
 - 전송한 이후에 정상 적재됐는지 여부를 확인하고 싶다면 ListenableFuture 메서드를 사용하면 된다
   - `ListenableFuture` 인스턴스에 addCallback 함수를 붙여 **프로듀서가 보낸 데이터의 브로커 적재 여부를 비동기로 확인할 수 있다**.
   - 브로커에 정상 적재되었을 경우 onSuccess 메서드가 호출, 적재되지 않고 이슈가 발생했다면 onFailure 메서드 호출
+
+### 4.4.2. 스프링 카프카 컨슈머
+- `레코드 리스너` : 단 1개의 레코드 처리
+- `배치 리스너` : 기존 카프카 클라이언트 라이브러리의 poll() 메서드로 리턴받은 ConsumerRecords처럼 한 번에 여러 개 레코드들을 처리할 수 있다.
+- **매뉴얼 커밋을 사용할 경우에는 Acknowledging이 붙은 리스너**를 사용하고, Kafka Consumer 인스턴스에 직접 접근하여 컨트롤하고 싶다면 ConsumerAware가 붙은 리스너를 사용한다
+  - AcknowledgingMessageListener
+  - ConsumerAwareMessageListener
+  - AcknowledgingConsumerAwareMessageListener
