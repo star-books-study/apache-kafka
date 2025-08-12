@@ -427,6 +427,10 @@ public void run(String... args) {
 - `레코드 리스너` : 단 1개의 레코드 처리
 - `배치 리스너` : 기존 카프카 클라이언트 라이브러리의 poll() 메서드로 리턴받은 ConsumerRecords처럼 한 번에 여러 개 레코드들을 처리할 수 있다.
 - **매뉴얼 커밋을 사용할 경우에는 Acknowledging이 붙은 리스너**를 사용하고, Kafka Consumer 인스턴스에 직접 접근하여 컨트롤하고 싶다면 ConsumerAware가 붙은 리스너를 사용한다
-  - AcknowledgingMessageListener
-  - ConsumerAwareMessageListener
+  - MessageListener : 오토커밋 또는 컨슈머 컨테이너의 AckMode 사용할 경우
+  - AcknowledgingMessageListener : **매뉴얼 커밋** 사용할 경우
+  - ConsumerAwareMessageListener : 컨슈머 객체를 활용하고 싶은 경우
   - AcknowledgingConsumerAwareMessageListener
+- 카프카 컨슈머에서 커밋을 직접 구현할 때는 오토 커밋 (enable.auto.commit = true), 동기 커밋 (commitSync), 비동기 커밋 (commitAsync) 크게 세 가지로 나뉘지만 실제 운영환경에서는 다양한 종류 커밋을 구현해 사용한다
+- 스프링 카프카에서는 커밋이라고 부르지 않고 `AckMode` 라고 부른다.
+  - 프로듀서에서 사용하는 acks 옵션과 동일한 어원인 Acknowledgement 를 사용하므로 AckMode 와 acks 를 혼동하지 않도록 주의해야 한다
