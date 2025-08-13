@@ -434,3 +434,15 @@ public void run(String... args) {
 - 카프카 컨슈머에서 커밋을 직접 구현할 때는 오토 커밋 (enable.auto.commit = true), 동기 커밋 (commitSync), 비동기 커밋 (commitAsync) 크게 세 가지로 나뉘지만 실제 운영환경에서는 다양한 종류 커밋을 구현해 사용한다
 - 스프링 카프카에서는 커밋이라고 부르지 않고 `AckMode` 라고 부른다.
   - 프로듀서에서 사용하는 acks 옵션과 동일한 어원인 Acknowledgement 를 사용하므로 AckMode 와 acks 를 혼동하지 않도록 주의해야 한다
+
+#### 기본 리스너 컨테이너
+- `client.id` : 컨슈머 그룹과는 별개로, Kafka 브로커나 모니터링 툴이 "어떤 클라이언트인지" 구분하기 위한 이름. 메시지 소비나 파티션 할당에는 영향을 주지 않지만 운영에서 매우 중요한 메타데이터
+  > @KafkaListener 옵션 중 clientIdPrefix 도 찾아보기
+- 개별 리스너에 카프카 컨슈머 옵션값을 부여하고 싶다면 @KafkaListener properties 옵션을 사용
+- 2개 이상의 카프카 컨슈머 스레드를 실행하고 싶다면 concurrency 옵션 사용 -> **concurrency 옵션값에 해당하는 만큼 컨슈머 스레드를 만들어서 병렬처리**
+- 배치 컨슈머 리스너 (`ConsumerAwareMessageListener`)
+  - **동기, 비동기 커밋**이나 컨슈머 인스턴스에서 제공하는 메서드들을 활용하고 싶을 때 사용
+  - consumer.commitSync(currentOffsets);
+- 배치 커밋 리스너 (`AcknowledgingMessageListener`)
+  - 컨슈머 컨테이너에서 관리하는 **AckMode를 사용하여 커밋하고 싶을 경우** 사용
+  > commitSync() vs. acknowledge() (+ MANUAL_IMMEDIATE)
