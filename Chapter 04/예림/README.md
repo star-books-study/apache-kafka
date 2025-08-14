@@ -112,3 +112,8 @@
 - `컨슈머 랙 평가` : 버로우에서 컨슈머 랙의 상태를 표현하는 것
   - 컨슈머 랙과 파티션의 오프셋을 슬라이딩 윈도우로 계산하면 상태가 정해진다.
 <img width="459" height="170" alt="스크린샷 2025-08-12 오후 11 39 18" src="https://github.com/user-attachments/assets/df79c811-2017-4a8d-b7e5-224d4389c1cc" />
+
+- 파티션의 상태를 OK, STALLED, STOPPED로 표현
+- 컨슈머의 상태를 OK, WARNING, ERROR로 표현
+
+<img width="421" height="176" alt="스크린샷 2025-08-13 오후 11 58 57" src="https://github.com/user-attachments/assets/5ee2a666-7a15-479b-8cb8-03533fbb0df1" />
