@@ -446,3 +446,7 @@ public void run(String... args) {
 - 배치 커밋 리스너 (`AcknowledgingMessageListener`)
   - 컨슈머 컨테이너에서 관리하는 **AckMode를 사용하여 커밋하고 싶을 경우** 사용
   > commitSync() vs. acknowledge() (+ MANUAL_IMMEDIATE)
+
+
+#### 커스텀 리스너 컨테이너
+- 서로 다른 설정을 가진 2개 이상 리스너 구현 or 리밸런스 리스너 구현하려면 커스터 리스너 컨테이너를 사용해야 한다
