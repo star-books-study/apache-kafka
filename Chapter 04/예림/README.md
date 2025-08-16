@@ -113,8 +113,12 @@
   - 컨슈머 랙과 파티션의 오프셋을 슬라이딩 윈도우로 계산하면 상태가 정해진다.
 <img width="459" height="170" alt="스크린샷 2025-08-12 오후 11 39 18" src="https://github.com/user-attachments/assets/df79c811-2017-4a8d-b7e5-224d4389c1cc" />
 
-- 파티션의 상태를 OK, STALLED, STOPPED로 표현
-- 컨슈머의 상태를 OK, WARNING, ERROR로 표현
+- 파티션의 상태를 `OK`, `STALLED`, `STOPPED`로 표현
+- 컨슈머의 상태를 `OK`, `WARNING`, `ERROR`로 표현
 
 <img width="421" height="176" alt="스크린샷 2025-08-13 오후 11 58 57" src="https://github.com/user-attachments/assets/5ee2a666-7a15-479b-8cb8-03533fbb0df1" />
-- 프로듀서가 지속적으로 데이터를 추가하기 때문에 최신 오프셋은 계속해서 증가한다. 컨슈머는 처리를 하면서 컨슈머 랙이 증가하지만 다시 컨슈머 랙이 0으로 줄어드는 추세를 볼 수 있다. -> 정상 동작 -> 파티션 OK, 컨슈머 OK
+- 프로듀서가 지속적으로 데이터를 추가하기 때문에 최신 오프셋은 계속해서 증가한다. 컨슈머는 처리를 하면서 컨슈머 랙이
+ 증가하지만 다시 컨슈머 랙이 0으로 줄어드는 추세를 볼 수 있다. -> 정상 동작 -> 파티션 OK, 컨슈머 OK
+
+<img width="339" height="149" alt="스크린샷 2025-08-15 오후 11 54 35" src="https://github.com/user-attachments/assets/22df2e49-9637-469e-a986-7c100db0704a" />
+- 최신 오프셋과 컨슈머 오프셋의 거리가 계속 벌어지면서 컨슈머 랙은 지속적으로 증가 -> 파티션은 OK, 컨슈머는 WARNING
