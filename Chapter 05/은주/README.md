@@ -40,9 +40,32 @@
 ### 5.1.3. 기능 구현
 
 #### 하둡 적재 컨슈머 애플리케이션 개발
+```java
+    public static void main(String[] args) {
+        Runtime.getRuntime().addShutdownHook(new ShutdownThread()); // 안전한 컨슈머의 종료를 위해 셧다운 훅 선언
 
-- 안전한 컨슈머의 종료를 위해 셧다운 훅 선언
-  - 셧다운 훅이 발생했을 경우 각 컨슈머 스레드에 종료를 알리도록 명시적으로 stopAndWakeup() 메서드 호출
-- 컨슈머 스레드를 스레드 풀로 관리하기 위해 newCachedThreadPool()을 생성
-- 생성된 컨슈머 스레드 인스턴스들을 묶음으로 관리하기 위해 List<ConsumerWorker>로 선언된 workers 변수에 추가
-- execute() 메서드로 컨슈머 스레드 인스턴스들을 스레드 풀에 포함시켜 실행
+        Properties configs = new Properties();
+        configs.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS);
+        configs.put(ConsumerConfig.GROUP_ID_CONFIG, GROUP_ID);
+        configs.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
+        configs.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
+
+        ExecutorService executorService = Executors.newCachedThreadPool(); // 컨슈머 스레드를 스레드 풀로 관리하기 위해 newCachedThreadPool()을 생성
+        for (int i = 0; i < CONSUMER_COUNT; i++) {
+            workers.add(new ConsumerWorker(configs, TOPIC_NAME, i)); // 생성된 컨슈머 스레드 인스턴스들을 묶음으로 관리하기 위해 List<ConsumerWorker>로 선언된 workers 변수에 추가
+        }
+        workers.forEach(executorService::execute); // execute() 메서드로 컨슈머 스레드 인스턴스들을 스레드 풀에 포함시켜 실행
+    }
+
+    static class ShutdownThread extends Thread {
+        public void run() {
+            logger.info("Shutdown hook");
+            workers.forEach(ConsumerWorker::stopAndWakeup); // 셧다운 훅이 발생했을 경우 각 컨슈머 스레드에 종료를 알리도록 명시적으로 stopAndWakeup() 메서드 호출
+        }
+    }
+```
+- 어떤 방식으로 데이터를 적재하느냐는 데이터를 최종 적재하는 타깃 애플리케이션의 기능 지원 여부에 따라 달라진다.
+  - append? flush?
+- 컨슈머 멀티 스레드 환경은 동일 데이터의 동시 접근에 유의해야 한다. 여러 개의 컨슈머가 동일한 HDFS파일에 접근을 시도한다면 교착 상태에 빠질 수 있는 위험이 있기 때문이다
+  - 따라서 컨슈머 스레드에 할당된 파티션을 확인한 후, 데이터들을 각 파티션 번호를 붙인 파일에 저장한다 (즉, 파티션 0은 0번 파일에만 접근)
+  - ![alt text](image.png)
