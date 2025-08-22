@@ -69,3 +69,25 @@
 - 컨슈머 멀티 스레드 환경은 동일 데이터의 동시 접근에 유의해야 한다. 여러 개의 컨슈머가 동일한 HDFS파일에 접근을 시도한다면 교착 상태에 빠질 수 있는 위험이 있기 때문이다
   - 따라서 컨슈머 스레드에 할당된 파티션을 확인한 후, 데이터들을 각 파티션 번호를 붙인 파일에 저장한다 (즉, 파티션 0은 0번 파일에만 접근)
   - ![alt text](image.png)
+
+```java
+public class ConsumerWorker implements Runnable { // 컨슈머가 실행될 스레드를 정의하기 위해 Runnable 인터페이스로 ConsumerWorker 클래스 구현
+
+    private final Logger logger = LoggerFactory.getLogger(ConsumerWorker.class);
+    private static Map<Integer, List<String>> bufferString = new ConcurrentHashMap<>();
+    private static Map<Integer, Long> currentFileOffset = new ConcurrentHashMap<>();
+
+    private final static int FLUSH_RECORD_COUNT = 10;
+    private Properties prop;
+    private String topic;
+    private String threadName;
+    private KafkaConsumer<String, String> consumer;
+
+    public ConsumerWorker(Properties prop, String topic, int number) {
+        logger.info("Generate ConsumerWorker");
+        this.prop = prop;
+        this.topic = topic;
+        this.threadName = "consumer-thread-" + number;
+    }
+}
+```
