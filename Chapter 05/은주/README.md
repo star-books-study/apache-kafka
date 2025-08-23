@@ -74,7 +74,7 @@
 public class ConsumerWorker implements Runnable { // 컨슈머가 실행될 스레드를 정의하기 위해 Runnable 인터페이스로 ConsumerWorker 클래스 구현
 
     private final Logger logger = LoggerFactory.getLogger(ConsumerWorker.class);
-    private static Map<Integer, List<String>> bufferString = new ConcurrentHashMap<>();
+    private static Map<Integer, List<String>> bufferString = new ConcurrentHashMap<>(); // 컨슈머 poll() 메서드를 통해 전달받은 데이터 임시저장하는 버퍼
     private static Map<Integer, Long> currentFileOffset = new ConcurrentHashMap<>();
 
     private final static int FLUSH_RECORD_COUNT = 10;
