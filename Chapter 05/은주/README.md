@@ -91,3 +91,10 @@ public class ConsumerWorker implements Runnable { // 컨슈머가 실행될 스�
     }
 }
 ```
+
+### 5.1.4. 기능 테스트
+#### 분산 모드 카프카 커넥트 실행
+- 엘라스틱서치 싱크 커넥터 jar파일 생성, jar파일 이동
+- 분산 모드 커넥트 설정파일 수정
+- 분산 모드 커넥트 실행
+
