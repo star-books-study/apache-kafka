@@ -154,6 +154,163 @@
 - 엘라스틱서치에 저장된 데이터는 그라파나를 통해 그래프로 시각화할 수 있다.
 
 ### 4.3.3 컨슈머 배포 프로세스
-#### 중단 배포
-- 컨슈머 애플리케이션을 완전히 종료한 이후에 개선된 코드를 가진 애플리케이션을 배포하는 방식
-  - 한정된 서버 자원을 운영하는 기업에 적합
+- 중단 배포
+  - 컨슈머 애플리케이션을 완전히 종료한 이후에 개선된 코드를 가진 애플리케이션을 배포하는 방식
+    - 한정된 서버 자원을 운영하는 기업에 적합
+  <img width="423" height="355" alt="image" src="https://github.com/user-attachments/assets/c9b3d238-4515-491b-938b-7c78ca3753cd" />
+- 무중단 배포
+  - 블루 / 그린, 롤링, 카나리 배포
+<img width="381" height="400" alt="스크린샷 2025-08-31 오후 5 14 32" src="https://github.com/user-attachments/assets/e804fc7a-88fa-4586-9eed-55e17f4379e1" />
+
+## 4.4 스프링 카프카
+
+- 카프카를 스프링에서 효과적으로 사용할 수 있도록 만들어진 라이브러리
+
+### 4.4.1 스프링 카프카 프로듀서
+- 카프카 템플릿은 프로듀서 팩토리 클래스를 통해 생성할 수 있다.
+- 카프카 템플릿 사용 방법
+  - 스프링 기본 제공 ㅌㅁ프릿 사용
+  - 직접 프로듀서 팩토리로 생성
+ 
+#### 기본 카프카 템플릿
+- build.gradle
+```gradle
+  dependencies {
+      ...
+      implementation 'org.springframework.kafka:spring-kafka'
+      testImplementation 'org.springframework.kafka:spring-kafka-test'
+  }
+  ```
+- application.yml
+  ```
+  spring:
+  kafka:
+    producer:
+      bootstrap-servers: localhost:9092
+      acks: all
+  ```
+- 스프링 카프카에서 프로듀서를 사용할 경우에는 필수 옵션이 없다. 그렇기 때문에 옵션을 설정하지 않으면 bootstrap-servers는 localhost:9092, key-serializer, value-serializer는 StringSerializer로 자동 설정되어 실행된다.
+```java
+@SpringBootApplication
+@RequiredArgsConstructor
+public class SpringProducerApplication implements CommandLineRunner {
+    private static String TOPIC_NAME = "test";
+
+    private final KafkaTemplate<Integer, String> template;
+
+    public static void main(String[] args) {
+        SpringApplication.run(SpringProducerApplication.class, args);
+    }
+
+    @Override
+    public void run(String... args) {
+        for (int i = 0; i < 10; i++) {
+            template.send(TOPIC_NAME, "test" + i);
+        }
+
+        System.exit(0);
+    }
+}
+```
+
+#### 커스텀 카프카 템플릿
+- 커스텀 카프카 템플릿은 프로듀서 팩토리를 통해 만든 카프카 템플릿 객체를 빈으로 등록하여 사용하는 것이다. 프로듀서에 필요한 각종 옵션을 선언하여 사용할 수 있다.
+- 한 스프링 카프카 애플리케이션 내부에 다양한 종류의 카프카 프로듀서 인스턴스를 생성하고 싶다면 이 방식을 사용하면 된다.
+- A클러스터로 전송하는 카프카 프로듀서와 B클러스터로 전송하는 카프카 프로듀서를 동시에 사용할 수 있다.
+
+
+- 커스텀 카프카 템플릿을 사용하여 2개의 카프카 템플릿을 빈으로 등록하여 사용할 수 있다.
+```java
+@Configuration
+public class KafkaTemplateConfiguration {
+    /**
+     * KafkaTemplate 빈 객체 등록
+     * Bean name : customKafkaTemplate
+     * @return
+     */
+    @Bean
+    public KafkaTemplate<String, String> customKafkaTemplate() {
+
+        Map<String, Object> props = new HashMap<>();
+        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
+        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        props.put(ProducerConfig.ACKS_CONFIG, "all");
+
+        ProducerFactory<String, String> pf = new DefaultKafkaProducerFactory<>(props);
+
+        /* 빈 객체로 사용할 KafkaTemplate 인스턴스를 초기화하고 리턴한다. */
+        return new KafkaTemplate<>(pf);
+    }
+}
+
+```
+
+```java
+@SpringBootApplication
+@RequiredArgsConstructor
+public class SpringProducerApplication implements CommandLineRunner {
+    private static String TOPIC_NAME = "test";
+
+    private final KafkaTemplate<Integer, String> customKafkaTemplate;
+
+    public static void main(String[] args) {
+        SpringApplication.run(SpringProducerApplication.class, args);
+    }
+
+    @Override
+    public void run(String... args) {
+        ListenableFuture<SendResult<Integer, String>> future = customKafkaTemplate.send(TOPIC_NAME, "test");
+        future.addCallback(new KafkaSendCallback<Integer, String>() {
+            /* 프로듀서가 보낸 데이터의 브로커 적재 여부를 비동기로 확인 */
+            @Override // 정상일 경우
+            public void onSuccess(SendResult<Integer, String> result) {
+
+            }
+
+            @Override // 이슈가 발생했을 경우
+            public void onFailure(KafkaProducerException ex) {
+
+            }
+        });
+
+        System.exit(0);
+    }
+}
+```
+- ListenableFuture 인스턴스에 addCallback 함수를 붙여 프로듀서가 보낸 데이터의 브로커의 적재 여부를 비동기로 확인할 수 있다.
+
+### 4.4.2 스프링 카프카 컨슈머
+- 스프링 카프카의 컨슈머는 기존 컨슈머를 2개의 타입으로 나누고 커밋을 7가지로 나누어 세분화했다.
+
+- 리스너의 종류에 따라 한번 호출하는 메서드에서 처리하는 레코드의 개수가 달라진다.
+
+- 레코드 리스너
+  - 단 1개의 레코드를 처리한다.
+
+  - 스프링 카프카 컨슈머의 기본 리스너
+- 배치 리스너 (BatchMessageListener)
+  -  기존 카프카 클라이언트 라이브러리의 poll() ㅔㅁ서드로 리턴받은 CnsumerRecords처럼 한번에 여러개 레코드들을 처리한다.
+-  그 외
+  - 매뉴얼 커밋을 사용할 경우 Acknowledging 붙은 리스너를 사용하고, KafkaConsumer 인스턴스에 직접 접근하여 컨트롤하고 싶다면 ConsumerAware가 붙은 리스너를 사용하면 된다.
+
+#### 7가지 커밋
+- 카프카 클라이언트 라이브러리에서 컨슈머를 구현할때 가장 어려운 부분이 커밋을 구현하는 것이다. 카프카 컨슈머에서 커밋을 직접 구현할때 실제 운영 환경에서 다양한 종류의 커밋을 구현해서 사용한다. 스프링 카프카에서는 사용자가 사용할만한 커밋의 종류를 7가지로 세분화하고 미리 로직을 만들어놓았다.
+
+ 
+
+- 스프링 카프카에서는 커밋이라 부르지 않고, 'AckMode'라고 부른다. 프로듀서에서 사용하는 acks 옵션과 동일한 어원인 Acknowledgment를 사용하므로 AckMode와 acks를 혼동하지 않도록 주의해야한다.
+
+- 스프링 카프카 컨슈머의 AckMode 기본값은 BATCH이고, 컨슈머의 enable.auto.commit 옵션은 false 로 지정된다.
+
+#### 기본 리스너 컨테이너
+- 기본 리스너 컨테이너는 기본 리스너 컨테이너 팩토리를 통해 생성된 리스너 컨테이너를 사용한다.
+
+#### 배치 리스너
+배치 리스너는 레코드 리스너와 다르게 KafkaListener로 사용되는 메서드의 파라미터를 List 또는 ConsumerRecords로 받는다. 배치 리스너를 사용하는 경우에는 파라미터를 List 또는 ConsumerRecords로 선언해야한다.
+
+#### 배치 컨슈머 리스너
+- 배치 컨슈머 리스너는 컨슈머를 직접 사용하기 위해 컨슈머 인스턴스를 파라미터로 받는다.  동기, 비동기 커밋이나 컨슈머 인스턴스에서 제공하는 메서드들을 활용하고 싶다면 배치 컨슈머 리스너를 사용한다.
+
+#### 배치 커밋 리스너
+배치 커밋 리스너는 컨테이너에서 관리하는 AckMode를 사용하기 위해 Acknowledgement 인스턴스를 파라미터로 받는다. Acknowledgement 인스턴스는 커밋을 수행하기 위한 한정적인 메서드만 제공한다. 컨슈머 컨테이너에서 관리하는 AckMode를 사용하여 커밋하고 싶다면 배치 커밋 리스너를 사용하면 된다.
