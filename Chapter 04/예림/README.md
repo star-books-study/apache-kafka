@@ -314,3 +314,10 @@ public class SpringProducerApplication implements CommandLineRunner {
 
 #### 배치 커밋 리스너
 배치 커밋 리스너는 컨테이너에서 관리하는 AckMode를 사용하기 위해 Acknowledgement 인스턴스를 파라미터로 받는다. Acknowledgement 인스턴스는 커밋을 수행하기 위한 한정적인 메서드만 제공한다. 컨슈머 컨테이너에서 관리하는 AckMode를 사용하여 커밋하고 싶다면 배치 커밋 리스너를 사용하면 된다.
+
+#### 커스텀 리스너 컨테이너
+- 서로 다른 설정을 가진 2개 이상의 리스너를 구현하거나 리밸런스 리스너를 구현하기 위해서는 커스텀 리스너 컨테이너를 사용해야한다.
+
+- KafkaListenerContainerFactory
+- 커스텀 리스너 컨테이너를 만들기 위해서 스프링 카프카에서 카프카 리스너 컨테이너 팩토리 인스턴스를 생성해야한다.
+- 카프카 리스너 컨테이너 팩토리를 빈으로 등록하고 KafkaListener 어노테이션에서 커스텀 리스너 컨테이너 팩토리를 등록하면 커스텀 리스너 컨테이너를 사용할 수 있다.
