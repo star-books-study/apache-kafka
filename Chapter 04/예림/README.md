@@ -321,3 +321,11 @@ public class SpringProducerApplication implements CommandLineRunner {
 - KafkaListenerContainerFactory
 - 커스텀 리스너 컨테이너를 만들기 위해서 스프링 카프카에서 카프카 리스너 컨테이너 팩토리 인스턴스를 생성해야한다.
 - 카프카 리스너 컨테이너 팩토리를 빈으로 등록하고 KafkaListener 어노테이션에서 커스텀 리스너 컨테이너 팩토리를 등록하면 커스텀 리스너 컨테이너를 사용할 수 있다.
+
+```java
+@Configuration
+public class ListenerContainerConfiguration {
+
+  @Bean
+  public KafkaListenerContainerFactory<ConcurrentMessageListenerContainer<String, String> customContainerFactory() {
+  
