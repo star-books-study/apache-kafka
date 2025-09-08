@@ -328,4 +328,77 @@ public class ListenerContainerConfiguration {
 
   @Bean
   public KafkaListenerContainerFactory<ConcurrentMessageListenerContainer<String, String> customContainerFactory() {
-  
+  ...
+  Map<String, Object> props = new HashMap<>();
+  props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
+  props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+  props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+
+  // DefaultKafkaConsumerFactory 는 리스너 컨테이너 팩토리를 생성할때 컨슈머 기본 옵션을 설정하는 용도로 사용된다.
+  DefaultKafkaConsumerFactory cf = new DefaultKafkaConsumerFactory<>(props);
+
+  // ConcurrentKafkaListenerContainerFactory 는 리스너 컨테이너를 만들기위해 사용한다. 
+  ConcurrentKafkaListenerContainerFactory<String, String> factory = new ConcurrentKafkaListenerContainerFactory<>();
+
+  // 리밸런스 리스너를 선언한다.
+  factory.getContainerProperties().setConsumerRebalanceListener(new ConsumerAwareRebalanceListener() {
+
+    // 커밋이 되기 전에 리밸런스가 발생했을때
+    @Override
+    public void onPartitionsRevokedBeforeCommit(Consumer<?, ?> consumer, Collection<TopicPartition> partitions) {
+
+    }
+
+    // 커밋이 된 후에 리밸런스가 발생했을때
+    @Override
+    public void onPartitionsRevokedAfterCommit(Consumer<?, ?> consumer, Collection<TopicPartition> partitions) {
+
+    }
+
+    @Override
+    public void onPartitionsAssigned(Collection<TopicPartition> partitions) {
+
+    }
+
+    @Override
+    public void onPartitionsLost(Collection<TopicPartition> partitions) {
+
+    }
+  });
+
+  factory.setBatchListener(false);
+  factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.RECORD);
+  factory.setConsumerFactory(cf);
+
+  return factory;
+}
+```
+
+- 커스텀 컨슈머 리스너 팩토리 빈 객체를 사용하는 커스텀 리스너 컨테이너를 선언하는 코드
+```java
+@SpringBootApplication
+@Slf4j
+public class SpringConsumerApplication_Custom {
+    public static void main(String[] args) {
+        SpringApplication application = new SpringApplication(SpringConsumerApplication_Custom.class);
+        application.run(args);
+    }
+
+
+    @KafkaListener(topics = "test",
+            groupId = "test-group",
+            containerFactory = "customContainerFactory")
+    public void customListener(String data) {
+        log.info(data);
+    }
+}
+```
+
+## 4.5 정리
+- 기본적인 카프카 개념을 아는 것만큼 상세 개념을 아는 것도 중요하다.
+- 상세 개념을 통해 파이프라인을 최적화하고 한정된 리소스에서 최고의 성능을 내도록 설정할 수 있기 때문이다.
+- 토픽의 적정 파티션 개수를 알아보고 삭제 정책과 ISR에 대한 개념도 알아보았다.
+- 프로듀서의 acks 옵션이 파티션의 복제에 어떻게 관여를 하는지도 알아보았고 정확히 한번 전달을 위한 멱등성 프로듀서에 대한 개념도 알아보았다.
+- 트랜잭션 프로듀서와 트랜잭션 컨슈머를 통해 트랜잭션 단위의 레코드를 전송할 수 있는 방법도 알아보았다.
+- 컨슈머를 멀티 스레드로 운영하기 위한 방법과 운영하면서 필요한 컨슈머 랙 모니터링 그리고 배포 프로세스도 알아보았다.
+- 스프링 카프카에 대해서도 알아보았다. 수고했다!
