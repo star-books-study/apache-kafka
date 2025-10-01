@@ -71,6 +71,33 @@
 
   
   1. 컨슈머API를 사용하여 직접 애플리케이션을 개발
-  2. 커넥트 사용
+  3. 커넥트 사용
  
 ### 5.1.3 기능 구현
+    
+- 아키텍처
+  <img width="453" height="139" alt="스크린샷 2025-09-30 오후 9 44 07" src="https://github.com/user-attachments/assets/1d479523-5567-44db-bc2d-328e97e2a41b" />
+
+- 필요한 작업 리스트
+  - 로컬 하둡, 엘라스틱서치, 키바나 설치
+  - 토픽 생성
+  - 이벤트 수집 웹 페이지 개발
+  - REST API 프로듀서 애플리케이션 개발
+  - 하둡 적재 컨슈머 애플리케이션 개발
+  - 엘라스틱서치 싱크 커넥터 개발
+
+#### 로컬 하둡, 엘라스틱서치, 키바나 설치
+```
+brew install hadoop elasticsearch kibana
+```
+- fs.defaultFS 값은 하둡 경로의 core-site.xml에 다음과 같이 옵션을 넣으면 된다.
+  ```
+  <configuration>
+    «property>
+      <name›fs.defaultFS</name>
+      <value>hdfs://localhost: 9000</value>
+    </property>
+  </configuration>
+  ```
+
+#### 토픽 생성
