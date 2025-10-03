@@ -101,3 +101,29 @@ brew install hadoop elasticsearch kibana
   ```
 
 #### 토픽 생성
+- 웹 페이지 이벤트 수집 기능 정의에 따라 kafka-topics 명령으로 토픽 옵션을 조절하여 생성한다.
+- 복제 개수 2, 파티션 개수 3, 기타 옵션은 기본값
+```
+§ bin/kafka-topics.sh --create
+-bootstrap-server my-kafka:9092 \
+--replication-factor 2 \
+--partitions 3 \
+--topic select-color
+```
+
+
+#### 웹페이지 개발
+- html과 jQuery를 이용해 아래와 같은 화면 개발 (생략)
+<img width="321" height="200" alt="스크린샷 2025-10-02 오후 11 51 02" src="https://github.com/user-attachments/assets/207d6cef-4d95-47e7-a0c3-8ecd0fba157f" />
+
+#### REST API 프로듀서 개발
+- 스프리부트와 스프링 카프카 기반으로 개발
+- 필요한 라이브러리
+  ```gradle
+  dependencies {
+    compile 'org.springframework.kafka:spring-kafka:2.5.10.RELEASE'
+    compile 'org.springframework.boot:spring-boot-starter-web:2.3.4.RELEASE
+    compile 'com. google. code. gson:gson:2.8.6'
+  }
+  ```
+- 
