@@ -126,4 +126,23 @@ brew install hadoop elasticsearch kibana
     compile 'com. google. code. gson:gson:2.8.6'
   }
   ```
+- application.yml
+  ```yml
+  spring:
+    kafka:
+      bootstrap-servers: my-kafka:9092
+      producer:
+        acks: 1
+        key-serialier: org.apache.kafka.common.serialization.StringSerializer
+        value-serializer: org.kafka.common.serialization.StringSerialier
+  ```
+- SpringApiProducer 클래스 (@SpringBootApplication 어노테이션이 포함된 실행 클래스
+  ```java
+  @SpringBootApplication
+  public class RestApiProducer {
+    public static void main(String[] args) {
+      SpringApplication.run(RestApiProducer.class, args);
+    }
+  }
+  ```
 - 
