@@ -178,4 +178,29 @@ brew install hadoop elasticsearch kibana
       @RequestHeader("user-agent") String userAgentName,
       @RequestParam(value = "color") String colorName,
       @RequestParam(value = "user") String userName) {
-      // 생략
+      SimpleDateFormat sdfDate = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZZ");
+      Date now = new Date();
+      Gson gson = new Gson();
+      UserEventVO userEventVO = new UserEventVO(sdfDate.format(now), userAgentName, colorName, userName);
+      String jsonColorLog = gson.toJson(userEventVO);
+      kafkaTemplate.send("select-color", jsonColorLog).addCallback
+   (new ListenableFutureCallback<SendResult<String, String>>() { // select-color 토픽에 데이터를 전송한다. 메시지 키를 지정하지 않으므로 send() 메서드에는 토픽과 메시지 값만 넣으면 된다.
+
+        // 전송 성공, 실패 내역을 로그로 남긴다
+        @Override
+        public void onSuccess(SendResult<String, String> result) {
+          logger.info(result.toString());
+        }
+
+        @Override
+        public void onFalilure(Throwable ex) {
+          logger.error(ex.getMessage(), ex);
+        }
+      });
+    }
+  }
+  ```
+#### 하둡 적재 컨슈머 애플리케이션 개발
+- 컨슈머 애프리케이션 개발 전 어떤 스레드 전략으로 데이터를 적재할지 정하고 시작해야 함
+- 
+
