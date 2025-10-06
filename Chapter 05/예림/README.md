@@ -145,4 +145,37 @@ brew install hadoop elasticsearch kibana
     }
   }
   ```
-- 
+- VO 형태로 클래스 작성 (UserEventVO)
+  ```java
+  public class UserEventVO {
+    public UserEventVO(String timestamp, String userAgent, String colorName, String userName) {
+      this.timestamp = timestamp;
+      this.userAgent = userAgent;
+      this.colorName = colorName;
+      this.userName = userName;
+    }
+    private String timestamp;
+    private String userAgent;
+    private String colorName;
+    private String userName;
+  }
+  ```
+- 컨트롤러 클래스 (ProductController)
+  ```java
+  @RestController
+  @CrossOrigin(origins = "*", allowHeaders = "*")
+  public class ProduceController {
+    private final Logger logger = LoggerFactory.getLogger(ProduceController.class);
+
+    private final KafkaTemplate<String, String> kafkaTemplate);
+
+    public ProduceController(KafkaTemplate<String, String> kafkaTemplate) {
+      this.kakaTemplate = kafkaTemplate;
+    }
+
+    @GetMapping("/api/select")
+    public void selectColor{
+      @RequestHeader("user-agent") String userAgentName,
+      @RequestParam(value = "color") String colorName,
+      @RequestParam(value = "user") String userName) {
+      // 생략
