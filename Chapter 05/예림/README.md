@@ -202,5 +202,46 @@ brew install hadoop elasticsearch kibana
   ```
 #### 하둡 적재 컨슈머 애플리케이션 개발
 - 컨슈머 애프리케이션 개발 전 어떤 스레드 전략으로 데이터를 적재할지 정하고 시작해야 함
-- 
+- 3개 파티션으로 이루어진 select-color 토픽에 할당되는 컨슈머의 최대 개수는 3개임
+- 스레드 개수는 변수로 선언 (토픽의 데이터가 급속도로 늘어나 파티션을 늘리더라도 컨슈머의 스레드 개수를 효과적으로 늘릴 수 있도록)
+  <img width="378" height="149" alt="스크린샷 2025-10-07 오후 9 55 23" src="https://github.com/user-attachments/assets/682d2425-d813-4222-a752-73fa147c4bd1" />
+- 하둡과 연동하기 위해 필요한 라이브러리
+  ```gradle
+  dependencies {
+    compile 'org.slf4j:slf4j-simple:1.7.30
+    compile 'org.apache. kafka:kafka-clients:2.5.0 compile 'org.apache.hadoop: hadoop-client:3.3.0'
+  }
+  ```
+- 메인 스레드 (컨슈머 스레드 실행
+  ```java
+  public class HdfsSinkApplication {
+
+    private final static String TOPIC_NAME = "select-color"; // 생성할 스레드 개수를 변수로 선언
+  
+    // 생략
+  
+    public static void main(String[] args) {
+      Runtime.getRuntime().addShutdownHook (new ShutdownThread()); // 안전한 컨슈머의 종료를 위해 셧다운 훅 선언
+      Properties configs = new Properties();
+      configs.put (ConsumerCon fig. BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS);
+      configs.put(ConsumerCon fig.GROUP_ID_CONFIG, GROUP_ID);
+      configs.put (ConsumerCon fig.KEY_DESERIALIZER_CLASS_CONFIG,
+      StringDeserializer.class.getName ());
+      configs.put (ConsumerConfig. VALUE_DESERIALIZER_CLASS_CONFIG,
+      StringDeserializer.class.getName ()) ;
+      ExecutorService executorService = Executors. newCachedThreadPool() ; . ©
+      for (int i = 0; 1 < CONSUMER_COUNT; i++) {
+        workers.add(new ConsumerWorker (configs, TOPIC_NAME, i));
+        workers. forEach (executor Service: execute);
+      }
+    }
+    
+    static class ShutdownThread extends Thread {
+      public void run() {
+        Logger. info("Shutdown hook");
+        workers. forEach (ConsumerWorker: : stopAndWakeup) ;
+      }
+    }
+  }
+  ```
 
