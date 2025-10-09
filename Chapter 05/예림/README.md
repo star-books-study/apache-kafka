@@ -222,14 +222,15 @@ brew install hadoop elasticsearch kibana
   
     public static void main(String[] args) {
       Runtime.getRuntime().addShutdownHook (new ShutdownThread()); // 안전한 컨슈머의 종료를 위해 셧다운 훅 선언
-      Properties configs = new Properties();
-      configs.put (ConsumerCon fig. BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS);
+      Properties configs = new Properties(); // 컨슈머의 설정 선언
+      configs.put (ConsumerCon fig. BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS); // 
       configs.put(ConsumerCon fig.GROUP_ID_CONFIG, GROUP_ID);
       configs.put (ConsumerCon fig.KEY_DESERIALIZER_CLASS_CONFIG,
       StringDeserializer.class.getName ());
       configs.put (ConsumerConfig. VALUE_DESERIALIZER_CLASS_CONFIG,
-      StringDeserializer.class.getName ()) ;
-      ExecutorService executorService = Executors. newCachedThreadPool() ; . ©
+      StringDeserializer.class.getName ());
+
+      ExecutorService executorService = Executors. newCachedThreadPool(); // 컨슈머 스레드를 스레드 풀로 관리하기 위해 newCachedThreadPool() 선언
       for (int i = 0; 1 < CONSUMER_COUNT; i++) {
         workers.add(new ConsumerWorker (configs, TOPIC_NAME, i));
         workers. forEach (executor Service: execute);
@@ -244,4 +245,4 @@ brew install hadoop elasticsearch kibana
     }
   }
   ```
-
+- 
