@@ -212,7 +212,7 @@ brew install hadoop elasticsearch kibana
     compile 'org.apache. kafka:kafka-clients:2.5.0 compile 'org.apache.hadoop: hadoop-client:3.3.0'
   }
   ```
-- 메인 스레드 (컨슈머 스레드 실행
+- 메인 스레드 (컨슈머 스레드 실행)
   ```java
   public class HdfsSinkApplication {
 
@@ -232,17 +232,79 @@ brew install hadoop elasticsearch kibana
 
       ExecutorService executorService = Executors. newCachedThreadPool(); // 컨슈머 스레드를 스레드 풀로 관리하기 위해 newCachedThreadPool() 선언
       for (int i = 0; 1 < CONSUMER_COUNT; i++) {
-        workers.add(new ConsumerWorker (configs, TOPIC_NAME, i));
-        workers. forEach (executor Service: execute);
+        workers.add(new ConsumerWorker (configs, TOPIC_NAME, i)); // 컨슈머 스레드 CONSUMER_COUNT 변수 값만큼(여기서는 3) 생성한다. 생성된 컨슈머 스레드 인스턴스들을 묶음으로 관리하기 위해 List<ConsumerWorker>로 선언된 workers 변수에 추가한다
+        workers. forEach (executor Service: execute); // 컨슈머 스레드 인스턴스들을 스레드 풀에 포함시켜 실행
       }
     }
     
     static class ShutdownThread extends Thread {
       public void run() {
         Logger. info("Shutdown hook");
-        workers. forEach (ConsumerWorker: : stopAndWakeup) ;
+        workers.forEach (ConsumerWorker: : stopAndWakeup); 셧다운 훅이 발생했을 경우 각 컨슈머 스레드에 종료를 알리도록 명시적으로 stopAndWakeup() 메서드 호출
       }
     }
   }
   ```
-- 
+- ConsumerWorker는 HdfSinkApplication에서 전달받은 Properties 인스턴스로 컨슈머를 생성, 실행하는 스레드 클래스
+- 토픽에서 데이터를 받아 HDFS에 메시지 값들을 저장
+- 데이터를 저장하는 방식 2가지
+  - append - 파일이 없으면 파일 생성하고 poll()로 받은 데이터를 파일에 추가한다.
+    - 이 방식은 파일 개수를 늘리지 않고 계속해서 데이터를 추가할 수 있다는 장점이 있다
+  - flush - 버퍼에 일정 기간 데이터를 쌓고 일정 수준(시간 또는 개수)이 되면 데이터를 저장하는 방식
+- 어떤 방식으로 데이터를 적재하느냐는 데이털르 최종 적재하는 타깃 애플리케이션의 기능 지원 여부에 따라 달라진다.
+- 컨슈머 멀티 스레드 환경은 동일 데이터의 동시 접근에 유의해야 한다. 여러 개의 컨슈머가 동일한 HDFS 파일에 접근을 시도한다면 교착 상태에 빠질 수 있는 위험이 있기 때문이다.
+- 이를 해결하기 위한 방법
+  - 가장 간단하고 명확한 방법 - 파티션 번호에 따라 HDFS 파일 따로 저장
+    <img width="588" height="218" alt="image" src="https://github.com/user-attachments/assets/b4aa4188-cafc-4feb-8024-2989269a1a9c" />
+  - 각 스레드가 각 파티션 이름의 파일에 적재
+    <img width="658" height="218" alt="image" src="https://github.com/user-attachments/assets/313f2606-6ea3-4480-b4cb-6c3c2b65eed6" />
+- 지금까지 정리한 로직을 바탕으로 멀티 스레드로 동작하는 HDFS 적재 컨슈머 코드를 작성한다.
+- 크게 세 부분으로 나뉨
+  - poll() 메서드 호출
+  - HDFS 적재 로직
+  - 셧다운 로직
+```java
+public class ConsumerWorker implements Runnable {
+  private final Logger logger = LoggerFactory.getLogger(ConsumerWorker.class);
+  private static Map<Integer, List<String>> bufferString = new ConcurrentHashMap<>();
+  private static Map<Integer, Long> currentFileOffset = new ConcurrentHashMap<>();
+  ConcurrentHashMap<>();
+
+  private final static int FLUSH_REcORD_COUNT = 10;
+  private Properteis prop;
+  private String topic;
+  private String threadName;
+  private KafkaConsumer<String, String> consumer;
+
+  public ConsumerWorker(Properties prop, String topic, int number) {
+    logger.info("Generate ConsumerWorker");
+    this.prop = prop;
+    this.topic = topic;
+    this.threadName = "consumer-thread-" + number;
+  }
+
+  @Override
+  public void run() {
+    Thread.currentThread().setName(threadName);
+    consumer = new KafkaConsumer<>(prop);
+    consumer.subscribe(Arrays.asList(topic));
+    try {
+      while (true) {
+        ConsumerRecords<String, String> records = consumer.poll(Duration.ofSeconds(1));
+
+        for (ConsuerRecord<String, String> record : records) {
+          addHdfsFileBuffer(record);
+        }
+        saveBufferToHdfsFile(consumer.assignment());
+    }
+  } catch (WakeupException e) {
+      logger.warn("Wakeup consumer");
+  } catch (Exception e) {
+      logger.error(e.getMessage(), e);
+  } finally {
+    consumer.close();
+  }
+  ...
+}
+```
+- 웹 이벤트를 받
