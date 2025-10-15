@@ -307,4 +307,29 @@ public class ConsumerWorker implements Runnable {
   ...
 }
 ```
-- 웹 이벤트를 받
+- 다음은 HDFS 적재를 위한 로직이다.
+```java
+private void addHdfsFileBuffer(ConsumerRecord<String, String> record) {
+  List<String> buffer = bufferString.getOrDefault(record.partition(), new ArrayList<>());
+  buffer.add(record.value());
+  bufferString.put(record.partition(), buffer);
+
+  if(buffer.size() == 1)
+    concurrentFileOffset.put(record.partition(), record.offset());
+}
+
+private void saveBufferToHdfsFile(Set<TopicParition> partition) {
+  partition.forEach(p -> checkFlushCount(p.partition));
+}
+
+privagte void checkFlushCount(int partitionNo) {
+  if(bufferString.get(partitionNo) != null) {
+    if(bufferString.get(partitionNo).size() > FLUSH_RECORD_COUNT - 1) {
+      save(partitionNo);
+    }
+  }
+}
+```
+
+
+
