@@ -322,14 +322,24 @@ private void saveBufferToHdfsFile(Set<TopicParition> partition) {
   partition.forEach(p -> checkFlushCount(p.partition));
 }
 
-privagte void checkFlushCount(int partitionNo) {
+private void checkFlushCount(int partitionNo) {
   if(bufferString.get(partitionNo) != null) {
     if(bufferString.get(partitionNo).size() > FLUSH_RECORD_COUNT - 1) {
       save(partitionNo);
     }
   }
 }
-```
 
+private void save(int partitionNo) {
+  if (bufferString.get(partitionNo).size() > 0)
+    try {
+      String fileName = "/data/color-" + partitionNo + "-" + currentFileOffset.get(partitionNO) + ".log";
+      Configuration configuration = new Configuration();
+      configuration.set("fs.defaultFS", "hdfs://localhost:9000");
+      FileSystem hdfsFileSystem = FileSystem.get(configuration);
+      FSDataOutputStream fileOutputStream = hdfsFileSystem.create(new Path(fileName));
+      
+```
+- 
 
 
