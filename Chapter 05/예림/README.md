@@ -338,7 +338,14 @@ private void save(int partitionNo) {
       configuration.set("fs.defaultFS", "hdfs://localhost:9000");
       FileSystem hdfsFileSystem = FileSystem.get(configuration);
       FSDataOutputStream fileOutputStream = hdfsFileSystem.create(new Path(fileName));
-      
+      fileOutputStream.writeBytes(StringUtils.join(bufferString.get(partitionNO), "\n"));
+      fileOutputStream.close();
+
+      bufferString.put(partitionNo, new ArrayList<>());
+  } catch (Exception e) {
+    logger.error(e.getMessage(), e);
+  }
+}     
 ```
 - 
 
