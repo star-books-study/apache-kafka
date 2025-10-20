@@ -309,12 +309,12 @@ public class ConsumerWorker implements Runnable {
 ```
 - 다음은 HDFS 적재를 위한 로직이다.
 ```java
-private void addHdfsFileBuffer(ConsumerRecord<String, String> record) {
+private void addHdfsFileBuffer(ConsumerRecord<String, String> record) { // 레코드를 받아서 메시지값을 버퍼에 넣는 코드. 
   List<String> buffer = bufferString.getOrDefault(record.partition(), new ArrayList<>());
   buffer.add(record.value());
   bufferString.put(record.partition(), buffer);
 
-  if(buffer.size() == 1)
+  if(buffer.size() == 1) // 만약 버퍼 크기가 1이라면 버퍼의 가장 처음 오프셋이라는 뜻이므로 currentFileOffset 변수에 넣는다. 이렇게 변수에 넣으면 추후파일을 저장할 때 파티션 이름과 오프셋 번호를 붙여서 저장할 수 있기 때문에 이슈 발생 시 파티션과 오프셋에 대한 정보를 알 수 있다.
     concurrentFileOffset.put(record.partition(), record.offset());
 }
 
@@ -330,7 +330,7 @@ private void checkFlushCount(int partitionNo) {
   }
 }
 
-private void save(int partitionNo) {
+private void save(int partitionNo) { // 실질적인 HDFS 적재를 수행하는 메서드
   if (bufferString.get(partitionNo).size() > 0)
     try {
       String fileName = "/data/color-" + partitionNo + "-" + currentFileOffset.get(partitionNO) + ".log";
@@ -347,6 +347,222 @@ private void save(int partitionNo) {
   }
 }     
 ```
-- 
+- 마지막으로 안전한 컨슈머 스레드 종료를 위한 로직이다.
+  ```java
+  private void saveRemainBufferToHdfsFile() { // 버퍼에 남아있는 모든 데이터를 저장하기 위한 메서드이다. 컨슈머 스레드 종료 시에 호출된다.
+    bufferString.forEach((partitionNo, v) -> this.save(partitionNo));
+  }
+
+  public void stopAndWakeup() { // 셧다운 훅이 발생했을 때 안전한 종료를 위해 consumer에 wakeup() 메서드를 호출한다. 남은 버퍼의 데이터를 모두 저장
+    logger.info("stopAndWakeup");
+    consumer.wakeup();
+    saveRemainBufferToHdfsFile();
+  }
+  ```
+<img width="555" height="242" alt="image" src="https://github.com/user-attachments/assets/034dadb2-fe71-4954-9ea4-b1b7de310291" />
 
 
+#### 엘라스틱서치 싱크 커넥터 개발
+- 토픽의 데이터를 엘라스틱서치에 적재하기 위해 커넥터 개발
+```gradle
+dependencies {
+  compile 'com.google.code.gsongson:2.8.6'
+  compile 'org.apache.kafkatconnect-api:2.5.0'
+  compile 'org.slf4j:slf4j-simple:1.7.38'
+  compile 'org.elasticsearch.client:elasticsearch-rest-high-level-client:7.9.2'
+}
+```
+- `ElasticSearchSinkConnectorConfig` : 엘라스틱서치에 저장할 때 필요한 설정
+  
+  <img width="420" height="410" alt="image" src="https://github.com/user-attachments/assets/8ba8182d-ee01-41ed-9637-3d9dabb4f3d1" />
+
+- `ElasticSearchSinkConnecor` : 커넥터를 생성했을 때 최초로 실행됨. SinkConnector 추상 클래스를 상속받은 는 총 6개의 메서드를 구현해야 함
+  - 직접적으로 데이터 적재하는 로직이 포함되지는 않음
+  - 태스크 클래스를 지정하는 역할 수행
+    - version()
+    - start()
+    - taskClass()
+    - taskConfigs()
+    - config()
+    - stop()
+- ElasticSearchSinkTask : 실질적인 엘라스틱 서치 적재 로직이 들어감
+<img width="533" height="217" alt="image" src="https://github.com/user-attachments/assets/38334ff8-508b-4e4e-9635-a9bed3ca0bf3" />
+
+### 5.1.4 기능 테스트
+- 개발한 코드들을 로컬 개발환경에서 실행하기 위해 총 5가지 단계 실행
+  - REST 프로듀서 실행
+  - 하둡 적재 컨슈머 실행
+  - 분산 모드 카프카 커넥트 실행
+  - 엘라스틱서치 싱크 커넥터 실행
+  - 웹 페이지 실행 및 웹 이벤트 발생
+    <img width="255" height="225" alt="image" src="https://github.com/user-attachments/assets/25efcf3c-330e-4bf0-83c1-ef0b276c42c7" />
+
+
+### 5.1.5 상용 인프라 아키텍처
+- 최소한으로 웹 이벤트 수집 파이프라인 인프라를 구축하여 안전하게 운영하고 싶다면 아래와 같이 구성 추천
+  • L4 로드밸런서: 웹 이벤트를 받아서 프로듀서로 분배 역할
+  • 프로듀서: 2개 이상의 서버, 각 서버당 1개 프로듀서
+  • 카프카 클러스터: 3개 이상의 브로커로 구성
+  • 컨슈머: 2개 이상의 서버, 각 서버당 1개 컨슈머
+  • 커넥트: 2개 이상의 서버, 분산 모드 커넥트로 구성
+
+    <img width="465" height="261" alt="스크린샷 2025-10-19 오후 10 08 23" src="https://github.com/user-attachments/assets/a4a7d430-dcef-4d6e-ad35-8db4cec2e0c1" />
+
+## 5.2 서버 지표 수집 파이프라인 생성과 카프카 스트림즈 활용
+
+- 서버 지표들(서버의 CPU, 메모리, 네트워크, 디스크 지표 등)을 카프카로 수집하는 데이터 파이프라인을 만들고 적재된 데이터를 실시간 처리하는 로직을 개발한다.
+<img width="446" height="211" alt="스크린샷 2025-10-19 오후 10 09 29" src="https://github.com/user-attachments/assets/bfcdb996-c97d-4021-ab0b-f9a27cd4a3aa" />
+
+### 5.2.1 요구 사항
+- 컴퓨터의 서버 지표 중 CPU와 메모리 데이터를 수집해서 토픽으로 전송한다.
+- 토픽에 전송된 전체 지표 데이터는 분기 처리하여 CPU와 메모리 토픽에 각각 저장한다.
+- 로컬 컴퓨터 CPU 사용량이 50%가 넘을 경우에는 hostname과 timestamp 정보를 비정상 CPU 토픽으로 전송한다.
+- 서버 지표 수집에는 메트릭비트(metricbeat) 사용
+  - 서버 지표 수집에 특화된 경량 에이전트
+  - 서버 지표 수집과 프로듀서 역할을 동시에 함
+- 수집된 서버 지표 데이터를 실시간 처리하는 데는 카프카 스트림즈 사용
+  - 별개의 클러스터가 필요하지 않고 독립된 자바 애플리케이션으로 동작
+  - 
+### 5.2.2 정책 및 기능 정의
+#### 적재 정책
+- 서버 지표 수집할 때 중요한 건 24시간 365일 끊임없이 수집이 가능해야 한다는 것
+- 데이터를 적재할 때 지속적으로 데이털르 처리할 수 있으면서도 데이터 유실되거나 중복되는 것을 감안해서 파이프라인을 구성하자
+
+#### 토픽
+- 필요한 토픽
+  - 전체 서버의 지표들을 저장하는 토픽
+  - CPU 지표만 저장하는 토픽
+  - 메모리 지표만 저장하는 토픽
+  - 비정상 CPU 지표 정보를 저장하는 토픽
+- 서버 지표를 처리하는 데는 데이터 처리 순서보다는 유연하고 처리량을 늘리는 게 더 중요하기 때문에 메시지키는 사용 X
+- 파티션 크기는 3
+  - 서버들 개수가 많아지면 파티션 크기 늘리면 됨
+- 복제 개수는 2
+
+#### 데이터 포맷
+- JSON
+
+#### 메트릭 비트
+- 지표 수집 간격은 10초로 설정해 과도하게 수집되지 않도록 설정
+
+#### 카프카 스트림즈
+- 처리해야 할 부분 두 가지
+**1. 전체 지표를 가진 토픽의 데이터를 CPU와 메모리 토픽으로 분기하는 로직**
+  <img width="277" height="243" alt="image" src="https://github.com/user-attachments/assets/4b115daa-37d9-4046-bf8c-fa35bb1995fb" />
+
+  - 지표 토픽 소스를 KStream으로 선언하고 `branch()` 메서드로 KStream 배열을 리턴받아서 데 이터를 분기처리할 수 있다. 메트릭비트가 보낸 JSON 데이터의 metricset,name값으로 보내 는 네이터의 종류를 구분할 수 있기 때문에 CPU인 경우와 memory인 경우를 `Predicate` 인터 페이스로 구현하여 분기를 선언할 수 있다.
+**2. CPU 지표 중 전체 사용량이 50%가 넘는 경우에 대해 필터링하고 hostname과 timestamp 값으로 생성하는 로직**
+    
+<img width="359" height="109" alt="스크린샷 2025-10-19 오후 10 18 21" src="https://github.com/user-attachments/assets/ed42e042-70d8-458f-8bf6-17c84dd79703" />
+
+- 분기처리로 받은 CPU토픽 KStream객체를 필터링하는 네는 `flter()` 메서드를 사용하고 메시지 값을 변환하는 데에는 `mapValues()` 메서드를 사용하면 된다.
+- `filter()` 메서드의 파라미터로 Predicate 인터페이스를 받을 수 있는데, JSON 데이터의 전체 CPU 사용량의 50%가 넘는 경우 반환하도록 조건 처리를 추가한다.
+- 비정상 CPU 토픽에 hostname과 timestamp 네이터 를 보내기 위해 JSON 데이터의 변환이 필요한데 메시지 값만 변환하면 되므로 `mapValues()` 메서드를 활용하면 CPU 지표 토픽의 데이터를 변환하여 다음 싱크로 보낼 수 있다.
+
+**최종 토폴로지**
+<img width="478" height="210" alt="스크린샷 2025-10-19 오후 10 19 05" src="https://github.com/user-attachments/assets/b6c52ae9-7e62-45e3-92ce-cf7ede601334" />
+
+### 5.2.3 기능 구현
+- 아키텍처는 다음과 같다
+  <img width="506" height="205" alt="스크린샷 2025-10-19 오후 10 19 35" src="https://github.com/user-attachments/assets/e1260dfc-c1c8-49ba-8880-7916315883b5" />
+#### 토픽 생성
+- 생성할 토픽은 총 4개
+- 토픽의 파티션은 3, 복제 개수는 2로 설정하되 나머지 토픽 설정들은 기본값으로 생성한다.
+```bash
+$ bin/kafka-topics.sh --create \
+  --bootstrap-server my-kafka:9092 \
+  --replicatioin-factor 2\
+  --partiition 3 \
+  --topic metric.all
+```
+#### CPU 지표를 저장하는 토픽 생성
+```bash
+§ bin/kafka-topics.sh --create \
+--bootstrap-server my-kafka:9092 \
+--replication-factor 2 \
+--partitions 3 \
+--topic metric.cpu
+```
+
+#### 메모리 지표를 저장하는 토픽 생성
+```bash
+§ bin/kafka-topics.sh --create \
+--bootstrap-server my-kafka:9092 \
+--replication-factor 2 \
+--partitions 3 \
+--topic metric.memory
+```
+
+#### 비정상 CPU 지표 정보를 저장하는 토픽 생성
+```bash
+§ bin/kafka-topics.sh --create \
+--bootstrap-server my-kafka:9092 \
+--replication-factor 2 \
+--partitions 3 \
+--topic metric.cpu.alert
+```
+
+
+#### 메트릭비트 설치 및 설정
+- metricbeat 바이너리 파일과 동일한 디렉토리에 metricbeat.yml 파일을 생성하고 설정값 입력
+#### 카프카 스트림즈 개발
+```gradle
+dependencies {
+  compile group: 'org.apache.kafka', name: 'kafka-streams', version: '2.5.0'
+  compile 'com.google.code.gsongson:2.8.0'
+}
+```
+
+- MetricJsonUtils 클래스와 각 메서드를 작성해보자
+  ```java
+  public class MetricJsonUtils {
+    public static double getTotalCpuPercent(String value) {
+      return new JsonParser().parse(value).getAsJsonObject().get("system").getAsJsonObject().get("cpu").getAsJsonObject().get("total").getAsJsonObject().get("norm").getAsJsonObject().get("pct").getAsDouble();
+  }
+
+    public static String getMatricName(String value) {
+      return new JsonParser().parse(value).getAsJsonObject9).get("matricset").getAsJsonObject().get("name").getAsString();
+    }
+  
+    publc static String getHostTimeStamp(String value) {
+      JsonObject objectiveValue = new JsonParser().parse(value).getAsJsonObject();
+      JsonObject result = objectValue.getAsJsonObject("host");
+      result.add("timestamp", objectiveValue.get("@timestamp"));
+      return result.toString();
+    }
+  }
+  ```
+- 실질적인 토픽의 데이터 스트림 처리를 하는 MetricStream
+  
+  <img width="490" height="243" alt="스크린샷 2025-10-19 오후 10 29 01" src="https://github.com/user-attachments/assets/e193594e-8835-4564-aa66-556a52c78953" />
+  ```java
+  public class MetricStreams {
+    private static KafkaStreams streams;
+
+    public static void main(final String[] args) {
+      Runtime.getRuntime().addShutdownHook(new ShutdownThread());
+  
+      ...
+  
+      KStream<String, String> metrics = builder.stream("metric.all");
+      KStream<String, String>[] metricBranch = metric.branch((key, value) -> MetricJsonUtils.getMatricName(value).equals("cpu"), (key, value) -> MetricJsonUtils.getMatricName(value).equals("memory"));
+  
+      metricBranch[0].to("metric.cpu");
+      metricBranch[1].to("metric.memory");
+  
+      KStrema<String, String> filteredCpuMetric = metricBranch[0].filter((key, value) -> MatricJsonUtils.getTotalCpuPercent(value) > 0.5);
+  
+      filteredCpuMetric.mapValue(value -> MetricJsonUtils.getHostTimestamp(value)).to("metric.cpu.alert");
+  
+      streams = new KafkaStream(builder.builder(), props);
+      streams.start();
+    }
+
+    static class ShutdownThread extends Thread {
+      public void run() {
+        streams.close();
+      }
+    }
+  }
+  ```
+  
