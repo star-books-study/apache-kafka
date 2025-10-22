@@ -581,3 +581,23 @@ $ ./metricbeat -c metricbeat.yml
 
 #### 스트림즈 애플리케이션 실행
 
+```bash
+$ bin/kafka-console-consumer.sh --bootstrap-server my-kafka:9092 \
+  --topic matric.cpu \
+  --from-beginning
+```
+
+```bash
+$ bin/kafka-console-consumer.sh --bootstrap-server my-kafka:9092 \
+  --topic matric.memory \
+  --from-beginning
+```
+- 스트림즈 애플리케이션이 실행되고 있을 때 CPU에 부하를 주면  matric.cpu.alert에서 스트림즈가 변환한 데이터를 확인할 수 있다.
+```bash
+$ bin/kafka-console-consumer.sh --bootstrap-server my-kafka:9092 \
+  --topic matric.cpu.alert \
+  --from-beginning
+```
+
+### 5.2.5 상용 인프라 아키텍처
+- 
