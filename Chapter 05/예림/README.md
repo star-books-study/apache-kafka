@@ -606,3 +606,11 @@ $ bin/kafka-console-consumer.sh --bootstrap-server my-kafka:9092 \
   - 커넥트 : 서버 지표 데이터 저장용. 2개 이상의 서버, 분산 모드 커넥터로 구성
 
 ## 5.3 미러메이커2를 사용한 토픽 미러링
+
+### 5.3.1 요구 사항
+- 로컬 환경에서 카프카 클러스터가 실행되고 있어야 함
+```bash
+brew install kafka
+brew services start kakfa
+```
+### 5.3.2 기능 정의
