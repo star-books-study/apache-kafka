@@ -621,3 +621,5 @@ brew services start kakfa
 
 ### 5.3.3 기능 구현
 
+- 미러메이커2 설정
+  - config 폴더에 connect-mirror-maker.properties 파일
