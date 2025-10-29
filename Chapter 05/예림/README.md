@@ -620,6 +620,22 @@ brew services start kakfa
  
 
 ### 5.3.3 기능 구현
+<img width="368" height="230" alt="스크린샷 2025-10-28 오후 10 27 24" src="https://github.com/user-attachments/assets/34763e13-9e61-43a6-8f76-e23db31aa570" />
 
 - 미러메이커2 설정
   - config 폴더에 connect-mirror-maker.properties 파일
+
+### 5.3.4 기능 테스트
+- 미러메이커2를 실행하고 미러링이 되는 것을 확인하기 위해 2가지 단계를 실행한다.
+  - 클러스터A에 weather.seoul 생성
+  - 미러메이커2 실행
+  <img width="197" height="306" alt="스크린샷 2025-10-28 오후 10 28 35" src="https://github.com/user-attachments/assets/6747eff1-e745-4c15-940e-0a21318ed73f" />
+
+#### 클러스터A에 weather.seoul 생성
+```
+$ bin/kafka-topics.sh --create \
+  --bootstrap-server my-kafka:9092 \
+  --partition 3 \
+  --topic weather.seoul
+```
+#### 미러메이커2 실행
