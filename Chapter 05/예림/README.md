@@ -639,3 +639,33 @@ $ bin/kafka-topics.sh --create \
   --topic weather.seoul
 ```
 #### 미러메이커2 실행
+```
+$ bin/connect-mirror-maker.sh config/connect-mirror-make.properties
+```
+
+- 클러스터 B(로컬)에 토픽이 미러링되어 생성되었는지 kafka-topics.sh를 사용하여 확인
+  ```
+  $ bin/kafka-topics.sh --bootstrap-server localhost:9092 --list
+  A.weather.seoul
+  ```
+- 미러링된 토픽도 파티션 개수가 3개인지 확인
+  ```
+  $ bin/kafka kafka-topics.sh --bootstrap-server localhost:9092 --topic A.weather.seoul --describe
+  ```
+- 클러스터 A의 weather.seoul로 데이터를 보내고 A.weather.seoul에 데이터가 복제되는지 확인
+  ```
+  $ bin/kafka-console-producer.sh --bootstrap-server my-kafka:9092 --topic weather.seoul
+  > sunny
+  > cloudy
+  ```
+  - kafka-console-producer.sh를 사용해서 sunny, cloudy 메시지 값을 전송했다.
+  ```
+  $ bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic A.weather.seoul --from-beginning
+  cloudy
+  sunny
+  ```
+- 클러스터B의 A.weather.seoul에 2개의 메시지 값이 정상적으로 들어온 것을 확인할 수 있다.
+
+
+### 5.3.5 상용 인프라 아키텍처
+
