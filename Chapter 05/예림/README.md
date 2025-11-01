@@ -669,3 +669,7 @@ $ bin/connect-mirror-maker.sh config/connect-mirror-make.properties
 
 ### 5.3.5 상용 인프라 아키텍처
 
+- 상용 환경의 클러스터 간 토픽 미러링 구축한다면 아래와 같은 아키텍처를 제안함
+  - **미러메이커2** : 2개 이상의 서버
+  <img width="354" height="202" alt="스크린샷 2025-10-31 오후 11 52 17" src="https://github.com/user-attachments/assets/5dfe8cf5-b2d1-4852-8bbe-7440c89dc844" />
+  - 미러메이커2를 실행하는 서버를 2대 배치하고 카프카 클러스터의 브로커 개수를 3개로 운영하여 일부 서버에 이슈가 발생하더라도 안전하게 토픽을 미러링할 수 있다.
