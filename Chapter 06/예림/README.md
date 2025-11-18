@@ -55,3 +55,34 @@
 - SASL_SSL 보안 인증 방식은 SSL 통신을 통한 인증으로 탈취 위협으로부터 가장 안전한 방식이다.
 
 #### 6.1.1.4 프로듀서 애플리케이션 연동
+- 기존 방식처럼 프로듀서를 만들기 위한 kafka-client 라이브러리를 build.gradle에 추가한다. 추가로 카프카 클라이언트 로그를 확인하기 위해 slf4j-simple 라이브러리도 추가한다.
+- 컨플루언트 클라우드를 통해 생성된 카프카 클러스터의 비전은 컨플루언트 플랫폼에서 제공하는 가장 최신 버전으로 항상 업데이트 된다.
+
+```java
+public class ConfluentCloudProducer {
+  ...
+
+  private final static String SECURITY_PROTOCOL = "SASL_SSL"; // SSAL 보안 접속을 하기 위해 보안 프로토콜들을 선언한다.
+
+  public static void main(String[] args) {
+    Properties configs = new Properties();
+    configs.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS);
+    ...
+
+    KafkaProducer<String, String> producer = new KafkaProducer<>(configs);
+    String messageKey = "hellokafka"; 
+    String messageValue = "helloConfluentCloud";
+    ProduceRecord<String, String> record = new ProducerRecord<>(TOPIC_NAME, messageKey, messageValue);
+    try {
+      RecordMetadata metadata = producer.send(record).get(); // 프로듀서가 전송한 데이터가 정상적으로 브로커에 적재되었는지 여부를 확인하기 위해 RecordMetadata로 리턴받는다.
+      logger.info(metadata.toString());
+    } catch (Exception e) {
+      logger.error(e.getMessage(), e);
+    } finally {
+      producer.flush();
+      producer.close(); // 프로듀서에 존재하는 배치를 모두 전송한 이후에 안전하게 종료한다.
+    }
+  }
+}
+```
+
