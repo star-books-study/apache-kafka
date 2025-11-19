@@ -63,6 +63,9 @@ public class ConfluentCloudProducer {
   ...
 
   private final static String SECURITY_PROTOCOL = "SASL_SSL"; // SSAL 보안 접속을 하기 위해 보안 프로토콜들을 선언한다.
+  private final static String JAAS_CONFIG = "org.apache.kafka.common.security.plain.PlainLoginModule  required username=\"2MA2CQM3Y6GVATMX\" password=\"생략"\;
+  private final static String SSL_ENDPOOINT = "https";
+  private final static String SASL_MECHANISM = "PLAIN";
 
   public static void main(String[] args) {
     Properties configs = new Properties();
