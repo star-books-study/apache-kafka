@@ -88,4 +88,6 @@ public class ConfluentCloudProducer {
   }
 }
 ```
+#### 6.1.1.5 컨슈머 애플리케이션 연동
+- 컨슈머도 프로듀서와 동일하게 보안 설정
 
