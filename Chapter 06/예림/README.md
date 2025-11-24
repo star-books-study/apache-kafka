@@ -90,4 +90,11 @@ public class ConfluentCloudProducer {
 ```
 #### 6.1.1.5 컨슈머 애플리케이션 연동
 - 컨슈머도 프로듀서와 동일하게 보안 설정
+<img width="445" height="475" alt="스크린샷 2025-11-23 오후 8 55 19" src="https://github.com/user-attachments/assets/49e8456c-2b60-4935-ba90-bd17798e6719" />
+<img width="446" height="299" alt="스크린샷 2025-11-23 오후 8 55 30" src="https://github.com/user-attachments/assets/a4c81ab5-8103-4c8c-ad82-7936f60942e5" />
 
+- ConfluentCloudConsumer.java를 실행하면 컨슈머 애플리케이션이 동작하면서 test.log 토픽의 데이털르 가져올 것이다. 만약 보안 설정이 정상적으로 맺어지고 데이터를 가져온다면 컨슈머 로그에 프로듀서가 보낸 레코드의 메시지 키와 메시지 값이 출력될 것이다.
+- Consumers 탭을 활용하면 편리하게 랙을 확인할 수 있다.
+- 컨플루언트 클라우드에서는 클러스터 운영에 획기적으로 도움을 주는 데이터 흐름 시각화를 제공한다.
+
+#### 6.1.1.6 커넥터 S3 적재 파이프라인
