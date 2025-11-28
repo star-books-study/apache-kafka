@@ -103,3 +103,4 @@ public class ConfluentCloudProducer {
 - S3에 적재할 데이터는 1개 이상의 토픽을 선택할 수 있다.
 ## 6.2 AWS MSK
 - MSK : AWS에서 제공하는 SaaS형 아파치 카프카 서비스
+- MSK로 생성한 클러스터는 AWS에서 제공하는 인프라 영역에 구축된다. MSK는 AWS에서 운영하는 애플리케이션과 쉽게 연동할 수 있기 때문에 AWS를 이미 사용 중인 기업에서는 어렵지 않게 아키텍처에 포함시킬 수 있다.
