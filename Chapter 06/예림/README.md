@@ -116,4 +116,105 @@ public class ConfluentCloudProducer {
   - 모니터링을 위한 프로메테우스, 그라파나 연동
   - 콘솔 프로듀서, 컨슈머 연동
 #### 6.2.1.1 클러스터 생성
-- 
+- 3개 AZ에 3개 브로커로 운영하는 것이 2개 AZ에 4개 브로커로 클러스터를 운영하는 것보다 더 안전하게 운영할 수 있다.
+  <img width="786" height="486" alt="image" src="https://github.com/user-attachments/assets/7d933323-3506-46f0-85ac-edd4c0bf2d48" />
+
+- 3개 AZ에 3개 브로커로 운영하는 것이 안전
+<img width="415" height="296" alt="스크린샷 2025-12-07 오후 10 42 29" src="https://github.com/user-attachments/assets/4e7bac2f-725f-4199-b7b9-9f2200558911" />
+
+#### 6.2.1.2 MSK 클러스터 연동 인스턴스 생성
+- 만약 vpc 외부 네트워크에서 MSK 크러스터에 연결하기 위해서는 VPN, VPC 피어링, VPC 전송 케이트웨이, AWs Direct Connect를 사용해야만 한다.
+- 클러스터로 접근하는 가장 쉬운 방법은 VPC 내부에 MSK 클러스터 연동을 위한 인스턴스를 생성하는 것이다.
+
+<img width="312" height="274" alt="스크린샷 2025-12-07 오후 10 46 53" src="https://github.com/user-attachments/assets/76a7c0f1-e5ab-424c-b7bf-578935cd24aa" />
+- 실행한 모니터링 도구름 확인하기 위해 퍼블럭 서브넷을 생성하고 퍼블릭 서브넷에 신규 인스턴스가 위치하도록 설정 한다.
+- 이번에 설치할 모니터링 도구는 프로메테우스와 그라파나
+  - 프로메테우스는 JMX 익스 포터와 노드 익스포터로부터 지표를 수집하고 저장한다. 그라파나는 프로메테우스에 저장된 데이터를 시각화하여 그래프로 조회할 수 있다.
+#### 6.2.1.3 토픽 생성
+- 생성한 인스턴스로 접속해 카프카 바이너리 파일을 다운 받고 실행
+- 토픽 생성 명령 `kafka-topics.sh --create`
+#### 6.2.1.4 프로메테우스 설치 및 연동
+- 프로메테우스가 설치된 인스턴스의 퍼블릭 IP 그리고 9090 포트를 사용하여 웹 브라우저를 통해 접속
+- 프로메테우스 웹 브라우저는 현재 모니터링하고 있는 익스포터를 확인하고 익스포터를 통해 수집한 데이터를 PromQL로 조회할 수 있다.
+- 대시보드는 그라파타를 통해 구성
+- 프로메테우스가 수집한 데이터는 <지표. 이름><레이블 키>=<레이블 값기 형태로 이루어 진다. 지표 이름은 데이터의 종류를 뜻한다. 레이블 키는 데이터의 특징, 레이블 값은 해당 데이터에 대한 값을 뜻한다. 지표와 레이블로 이루어진 값은 PromOL 을 동해 원하는 값을 뽑아낼 수 있다.
+
+#### 6.2.1.5 그라파나 설치 및 연동
+- 웹브라우저에서 인스턴스의 퍼블릭 IP를 호스트로 하고 그라파나의 기본 포트인 3000번 포트로 접속
+- 그라파나는 웹 대시보드 애플리케이션으로서 자체적으로 지표를 저장하거나 수집하는 기능은 가지고 있지 않음
+  - 다양한 데이터 소스들(mysql, elasticsearch, influxdh, prometheus 등) 을 그라파나로 연결 설정하고 쿼리를 통해 그래프들을 그리는 기능이 핵심
+  - 이미 우리는 MSK 클러스터의 지표들을 프로메테우스로 수집, 저장했다.
+  - 그라파나의 데이터 소스로 프로 메테우스를 설정하면 MSK 클러스터의 지표들을 그래프로 그릴 수 있다.
+- 인스턴스에 띄운 프로메테우스와 연동하기 위해 그라파나에서는 localhost의 9090 포트(프로메테우스 통신 포트)로 설정한다.
+- 만약 프로메테우스를 다른 인스턴스에서 실행했다면 그라 파나가 통신할 수 있도록 해당 인스턴스의 사설IP 또는 공인IP를 입력하여 데이터 소스를 연결할 수 있다.
+- 그라파나에서 MSK 클러스터를 운영하기 위해 필요한 그래프는 매우 다양하다.
+  - 대표적인 모니터링 지표 : 파티션 개수, 토픽 개수, 브로커빌 스토리지 남은 용량, 메모리 등
+- 대시보드에 그리는 그래프
+  • 브로커별 CPU 사용량
+  • 브로커별 메모리 사용량
+  • 토픽별 클러스터로 들어오는 메시지 개수
+  • 토픽별 클러스터에서 나가는 메시지 개수
+#### 6.2.1.6 콘솔 프로듀서, 컨슈머 연동
+- MSK 클러스터와 통신하려면 SSL 인증 필수
+
+  - 클라이언트가 MSK(TLS 활성화)와 통신하려면 truststore 필요
+  
+  - JDK에 기본 제공되는 cacerts 파일을 truststore로 사용 가능
+
+  - /jre/lib/security/cacerts 를 복사해서
+  kafka.client.truststore.jks 이름으로 저장한다.
+
+- 클라이언트 설정 파일(client.properties) 생성
+```
+security.protocol=SSL
+ssl.truststore.location=./kafka.client.truststore.jks
+```
+
+
+- 이 파일을 producer와 consumer 실행할 때 --producer.config, --consumer.config 옵션으로 사용.
+
+- 콘솔 프로듀서 실행
+```
+kafka-console-producer.sh \
+  --broker-list <MSK broker list> \
+  --producer.config client.properties \
+  --topic test.log
+```
+
+- 메시지 입력하면 MSK로 전송됨.
+
+- 콘솔 컨슈머 실행
+```
+kafka-console-consumer.sh \
+  --bootstrap-server <MSK broker list> \
+  --consumer.config client.properties \
+  --topic test.log \
+  --from-beginning
+```
+
+- 프로듀서가 보낸 메시지를 정상적으로 읽어올 수 있음.
+
+- MSK 모니터링
+
+  - CloudWatch 또는 Prometheus로 카프카 입출력량 확인 가능.
+
+  - 장애 브로커 자동 교체 등 운영 편의성이 뛰어남.
+
+- MSK 장단점 정리
+  - 장점
+
+  AWS 환경에 자연스럽게 통합 → 운영 난도 매우 낮음.
+
+  CloudWatch 기반의 강력한 모니터링.
+
+- 브로커 장애 시 자동 복구
+
+  - 카프카의 대부분 옵션 그대로 사용 가능 → 사실상 serverless 느낌.
+
+  - 운영자는 인프라 대신 카프카 활용(비즈니스 로직) 에 집중 가능.
+
+- 단점
+
+  - MSK가 제공하는 인스턴스 타입만 사용 가능
+  
+  - Reserved Instance 미지원 → 직접 EC2에 구성할 때보다 다소 비쌈
